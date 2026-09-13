@@ -1,0 +1,4 @@
+duration_seconds,frequency_hz,transition_seconds
+300,10.00,30
+600,7.83,60
+300,4.00,0
