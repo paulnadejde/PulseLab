@@ -267,6 +267,8 @@ public final class MainActivity extends Activity {
         RadioButton mono = radio("Monoaural", !audioService.engine().isBinaural());
         audioMode.addView(binaural, weighted());
         audioMode.addView(mono, weighted());
+        audioMode.setOnCheckedChangeListener((group, checkedId) ->
+            audioService.engine().setBinauralMode(checkedId == binaural.getId()));
         content.addView(audioMode);
 
         title("Purtătoare (Hz)");

@@ -59,6 +59,7 @@ public final class AudioEngine {
     public boolean isGeneratorActive() { return generatorActive; }
     public boolean isGeneratorPaused() { return generatorPaused; }
     public boolean isBinaural() { return binaural; }
+    public void setBinauralMode(boolean enabled) { binaural = enabled; }
     public double carrierHz() { return carrierHz; }
     public float generatorVolume() { return generatorVolume; }
     public Noise noise() { return noise; }

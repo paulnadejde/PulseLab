@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- selecția Binaural/Monoaural este aplicată imediat, inclusiv în timpul redării;
+- modul monoaural continuă să trimită mixul identic către ambele canale.
+
 ## 0.1.0
 
 - Primul prototip Android.
