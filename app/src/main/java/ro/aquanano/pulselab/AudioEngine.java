@@ -48,8 +48,7 @@ public final class AudioEngine {
 
     private double phaseLeft;
     private double phaseRight;
-    private double monoPhaseA;
-    private double monoPhaseB;
+    private double monoPhase;
     private final Random random = new Random();
     private double pink0, pink1, pink2;
     private double brown;
@@ -213,9 +212,8 @@ public final class AudioEngine {
                     left += Math.sin(phaseLeft) * generatorVolume;
                     right += Math.sin(phaseRight) * generatorVolume;
                 } else {
-                    monoPhaseA = wrap(monoPhaseA + twoPi(Math.max(0.1, carrierHz - delta / 2.0)));
-                    monoPhaseB = wrap(monoPhaseB + twoPi(carrierHz + delta / 2.0));
-                    double sample = (Math.sin(monoPhaseA) + Math.sin(monoPhaseB)) * 0.5 * generatorVolume;
+                    monoPhase = wrap(monoPhase + twoPi(carrierHz));
+                    double sample = Math.sin(monoPhase) * generatorVolume;
                     left += sample;
                     right += sample;
                 }

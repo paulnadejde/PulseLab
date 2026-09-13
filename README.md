@@ -35,7 +35,7 @@ Android, iar aplicația primește acces numai la fișierele alese explicit.
 - cinci dialuri pentru diferență, rezoluție 0,01 Hz, interval 0–999,99 Hz;
 - limitarea diferenței la jumătatea purtătoarei;
 - binaural: `stânga = purtătoare − diferență/2`, `dreapta = purtătoare + diferență/2`;
-- monoaural: cele două sinusuri sunt mixate identic în ambele canale;
+- monoaural: purtătoarea este redată identic în ambele canale, fără aplicarea diferenței;
 - volum propriu și limitator moale la ieșire;
 - zgomot alb, roz sau brun cu volum separat;
 - piesă audio aleasă de utilizator și reluată în buclă;

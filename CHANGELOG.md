@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- corectează definiția modului monoaural: ambele canale redau exclusiv
+  purtătoarea, iar frecvența de diferență nu intră în semnalul audio;
+- păstrează comutarea imediată Binaural/Monoaural din 0.1.1.
+
 ## 0.1.1
 
 - selecția Binaural/Monoaural este aplicată imediat, inclusiv în timpul redării;
