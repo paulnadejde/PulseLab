@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4
+
+- corectează păstrarea bifei vectoriale după import și activează automat vectorul încărcat;
+- acceptă antetul CSV după linii goale sau comentarii și fișiere cu marcaj BOM;
+- afișează în timp real frecvența vectorială, etapa și faza curentă;
+- adaugă grafic vectorial full-screen în landscape, cu cursor și frecvență curentă;
+- permite denumirea celor zece preseturi de metronom;
+- evidențiază tabul activ și adaugă butoane colorate cu stare apăsată.
+
 ## 0.1.3
 
 - numele afișat al aplicației devine AquaRitm;

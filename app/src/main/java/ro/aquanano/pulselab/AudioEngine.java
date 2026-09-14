@@ -150,6 +150,12 @@ public final class AudioEngine {
     }
 
     public long generatorLimitMs() { return sessionLimitMs; }
+    public VectorProgram activeVector() { return vector; }
+    public boolean isVectorActive() { return generatorActive && vector != null; }
+    public VectorProgram.Position currentVectorPosition() {
+        VectorProgram p = vector;
+        return p == null ? null : p.at(generatorElapsedMs() / 1000.0);
+    }
     public double currentBeatHz() {
         VectorProgram p = vector;
         if (p == null) return beatHz;

@@ -10,6 +10,9 @@ import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -68,6 +71,7 @@ public final class MainActivity extends Activity {
     private SeekBar clickVolume;
     private SeekBar bellVolume;
     private Spinner presetSlot;
+    private EditText presetName;
     private DigitDialView carrierDial;
     private DigitDialView beatDial;
     private RadioGroup audioMode;
@@ -77,7 +81,9 @@ public final class MainActivity extends Activity {
     private EditText sessionMinutes;
     private CheckBox vectorMode;
     private TextView vectorLabel;
+    private TextView vectorStage;
     private VectorProgram loadedVector;
+    private boolean useVector;
     private Uri musicUri;
     private CheckBox strobe;
     private Spinner strobeColor;
@@ -125,10 +131,8 @@ public final class MainActivity extends Activity {
         root.addView(page, match());
 
         LinearLayout tabs = horizontal();
-        Button metroTab = button("METRONOM");
-        Button genTab = button("GENERATOR");
-        metroTab.setEnabled(showGenerator);
-        genTab.setEnabled(!showGenerator);
+        Button metroTab = tabButton("METRONOM", !showGenerator);
+        Button genTab = tabButton("GENERATOR", showGenerator);
         tabs.addView(metroTab, weighted());
         tabs.addView(genTab, weighted());
         page.addView(tabs);
@@ -241,10 +245,20 @@ public final class MainActivity extends Activity {
         content.addView(resetTimer);
 
         title("Preseturi metronom (10 sloturi)");
-        String[] slots = new String[10];
-        for (int i = 0; i < 10; i++) slots[i] = "Preset " + (i + 1);
+        String[] slots = metroPresetLabels();
         presetSlot = spinner(slots);
         content.addView(presetSlot);
+        presetName = new EditText(this);
+        presetName.setTextColor(Color.WHITE);
+        presetName.setHintTextColor(Color.GRAY);
+        presetName.setHint("Numele presetului");
+        presetName.setSingleLine(true);
+        content.addView(presetName);
+        presetSlot.setOnItemSelectedListener(new SimpleItemSelected() {
+            @Override public void selected(int position) {
+                presetName.setText(metroPresetName(position));
+            }
+        });
         LinearLayout presets = horizontal();
         Button save = button("SALVEAZĂ");
         Button load = button("ÎNCARCĂ");
@@ -299,7 +313,8 @@ public final class MainActivity extends Activity {
         duration.addView(sessionMinutes, weighted());
         duration.addView(text(" minute", 15));
         content.addView(duration);
-        vectorMode = check("Folosește vector CSV", false);
+        vectorMode = check("Folosește vector CSV", useVector);
+        vectorMode.setOnCheckedChangeListener((b, checked) -> useVector = checked);
         content.addView(vectorMode);
         Button importVector = button("Importă vector CSV");
         importVector.setOnClickListener(v -> pickFile(PICK_VECTOR, "text/*"));
@@ -307,6 +322,14 @@ public final class MainActivity extends Activity {
         vectorLabel = text(loadedVector == null ? "Niciun vector încărcat" :
             String.format(Locale.US, "Vector: %.0f secunde", loadedVector.totalSeconds()), 13);
         content.addView(vectorLabel);
+        vectorStage = text("Vector inactiv", 16);
+        vectorStage.setGravity(Gravity.CENTER);
+        content.addView(vectorStage);
+        Button showVectorGraph = button("AFIȘEAZĂ GRAFICUL VECTORULUI");
+        showVectorGraph.setEnabled(loadedVector != null);
+        showVectorGraph.setAlpha(loadedVector != null ? 1f : 0.4f);
+        showVectorGraph.setOnClickListener(v -> showVectorGraph());
+        content.addView(showVectorGraph);
 
         title("Stroboscop");
         strobe = check("Activează modularea luminii", false);
@@ -382,7 +405,14 @@ public final class MainActivity extends Activity {
             o.put("enabled", new JSONArray(audioService.engine().metronome().enabled()));
             o.put("click", clickVolume.getProgress());
             o.put("bell", bellVolume.getProgress());
+            String name = presetName.getText().toString().trim();
+            if (name.isEmpty()) name = "Preset " + (presetSlot.getSelectedItemPosition() + 1);
+            o.put("name", name);
             prefs().edit().putString("metro_" + presetSlot.getSelectedItemPosition(), o.toString()).apply();
+            int selected = presetSlot.getSelectedItemPosition();
+            presetSlot.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, metroPresetLabels()));
+            presetSlot.setSelection(selected);
             toast("Preset salvat");
         } catch (Exception e) { toast("Presetul nu a putut fi salvat"); }
     }
@@ -420,8 +450,9 @@ public final class MainActivity extends Activity {
         AudioEngine.Noise n = overlay >= 1 && overlay <= 3 ? AudioEngine.Noise.values()[overlay] : AudioEngine.Noise.NONE;
         audioService.engine().configureGenerator(audioMode.getCheckedRadioButtonId() == audioMode.getChildAt(0).getId(),
             carrier, beat, generatorVolume.getProgress() / 100f, n, overlayVolume.getProgress() / 100f);
-        VectorProgram p = vectorMode.isChecked() ? loadedVector : null;
-        if (vectorMode.isChecked() && p == null) { toast("Încarcă mai întâi un vector CSV"); return; }
+        useVector = vectorMode.isChecked();
+        VectorProgram p = useVector ? loadedVector : null;
+        if (useVector && p == null) { toast("Încarcă mai întâi un vector CSV"); return; }
         long limit = Math.round(parseDouble(sessionMinutes, 20) * 60_000);
         audioService.enterForeground();
         audioService.engine().startGenerator(limit, p);
@@ -456,6 +487,7 @@ public final class MainActivity extends Activity {
         if (requestCode == PICK_VECTOR) {
             try (InputStreamReader reader = new InputStreamReader(getContentResolver().openInputStream(uri))) {
                 loadedVector = VectorProgram.parseCsv(reader);
+                useVector = true;
                 toast("Vector încărcat: " + loadedVector.steps().size() + " pași");
                 renderCurrentScreen();
             } catch (Exception e) { toast("CSV invalid: " + e.getMessage()); }
@@ -489,6 +521,7 @@ public final class MainActivity extends Activity {
                 if (generatorTimer != null) {
                     generatorTimer.setText("Sesiune: " + formatTime(e.generatorElapsedMs()) + " / " + formatTime(e.generatorLimitMs()));
                 }
+                updateVectorStatus(e);
                 if (generatorWasActive && !e.isGeneratorActive()) {
                     audioService.stopMusic();
                     audioService.leaveForegroundIfIdle();
@@ -500,6 +533,61 @@ public final class MainActivity extends Activity {
             handler.postDelayed(this, 50);
         }
     };
+
+    private void updateVectorStatus(AudioEngine engine) {
+        if (!showGenerator || beatDial == null || vectorStage == null) return;
+        if (!engine.isVectorActive()) {
+            vectorStage.setText(useVector && loadedVector != null ? "Vector pregătit" : "Vector inactiv");
+            return;
+        }
+        VectorProgram.Position position = engine.currentVectorPosition();
+        VectorProgram program = engine.activeVector();
+        if (position == null || program == null) return;
+        if (Math.abs(beatDial.getValue() - position.frequencyHz) >= 0.005)
+            beatDial.setValue(position.frequencyHz);
+        String phase = position.transition ? "tranziție" : "menținere";
+        String monoNote = engine.isBinaural() ? "" : " • fm neaplicat audio în monoaural";
+        vectorStage.setText(String.format(Locale.US,
+            "VECTOR ACTIV • Etapa %d/%d • %s %s / %s • %.2f Hz%s",
+            position.stepIndex + 1, program.steps().size(), phase,
+            formatTime(Math.round(position.phaseElapsedSeconds * 1000)),
+            formatTime(Math.round(position.phaseDurationSeconds * 1000)),
+            position.frequencyHz, monoNote));
+    }
+
+    private void showVectorGraph() {
+        if (loadedVector == null) { toast("Încarcă mai întâi un vector CSV"); return; }
+        int count = loadedVector.steps().size();
+        double[] durations = new double[count];
+        double[] frequencies = new double[count];
+        double[] transitions = new double[count];
+        for (int i = 0; i < count; i++) {
+            VectorProgram.Step step = loadedVector.steps().get(i);
+            durations[i] = step.durationSeconds;
+            frequencies[i] = step.frequencyHz;
+            transitions[i] = step.transitionSeconds;
+        }
+        Intent graph = new Intent(this, VectorGraphActivity.class);
+        graph.putExtra(VectorGraphActivity.EXTRA_DURATIONS, durations);
+        graph.putExtra(VectorGraphActivity.EXTRA_FREQUENCIES, frequencies);
+        graph.putExtra(VectorGraphActivity.EXTRA_TRANSITIONS, transitions);
+        startActivity(graph);
+    }
+
+    private String[] metroPresetLabels() {
+        String[] labels = new String[10];
+        for (int i = 0; i < labels.length; i++)
+            labels[i] = (i + 1) + " — " + metroPresetName(i);
+        return labels;
+    }
+
+    private String metroPresetName(int index) {
+        String fallback = "Preset " + (index + 1);
+        try {
+            String raw = prefs().getString("metro_" + index, null);
+            return raw == null ? fallback : new JSONObject(raw).optString("name", fallback);
+        } catch (Exception ignored) { return fallback; }
+    }
 
     private void updateStrobe() {
         if (!showGenerator || strobe == null || !strobe.isChecked() || !audioService.engine().isGeneratorActive()
@@ -562,7 +650,56 @@ public final class MainActivity extends Activity {
         Button b = new Button(this);
         b.setText(value);
         b.setTextColor(Color.WHITE);
+        b.setTypeface(Typeface.DEFAULT_BOLD);
+        int color;
+        String upper = value.toUpperCase(Locale.ROOT);
+        if (upper.contains("START") || upper.contains("REIA")) color = Color.rgb(28, 135, 82);
+        else if (upper.contains("PAUZ")) color = Color.rgb(190, 123, 22);
+        else if (upper.contains("STOP") || upper.contains("RESET")) color = Color.rgb(174, 55, 62);
+        else if (upper.contains("SALVE")) color = Color.rgb(116, 70, 178);
+        else if (upper.contains("ÎNCARC") || upper.contains("IMPORT") || upper.contains("GRAFIC") || upper.contains("ALEGE"))
+            color = Color.rgb(33, 112, 165);
+        else color = Color.rgb(58, 75, 91);
+        applyButtonSurface(b, color);
         return b;
+    }
+
+    private Button tabButton(String value, boolean active) {
+        Button b = button(value);
+        applyButtonSurface(b, active ? ACCENT : Color.rgb(52, 57, 61));
+        b.setTextColor(active ? Color.BLACK : Color.WHITE);
+        return b;
+    }
+
+    private void applyButtonSurface(Button button, int color) {
+        GradientDrawable normal = new GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{lighten(color, 0.18f), color, darken(color, 0.18f)});
+        normal.setCornerRadius(dp(8));
+        normal.setStroke(dp(1), lighten(color, 0.32f));
+        GradientDrawable pressed = new GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            new int[]{darken(color, 0.24f), darken(color, 0.08f)});
+        pressed.setCornerRadius(dp(8));
+        pressed.setStroke(dp(1), darken(color, 0.35f));
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_pressed}, pressed);
+        states.addState(new int[]{}, normal);
+        button.setBackground(states);
+        button.setElevation(dp(3));
+    }
+
+    private static int lighten(int color, float amount) {
+        return Color.rgb(
+            Math.min(255, Math.round(Color.red(color) + (255 - Color.red(color)) * amount)),
+            Math.min(255, Math.round(Color.green(color) + (255 - Color.green(color)) * amount)),
+            Math.min(255, Math.round(Color.blue(color) + (255 - Color.blue(color)) * amount)));
+    }
+
+    private static int darken(int color, float amount) {
+        return Color.rgb(Math.round(Color.red(color) * (1 - amount)),
+            Math.round(Color.green(color) * (1 - amount)),
+            Math.round(Color.blue(color) * (1 - amount)));
     }
 
     private CheckBox check(String value, boolean checked) {
