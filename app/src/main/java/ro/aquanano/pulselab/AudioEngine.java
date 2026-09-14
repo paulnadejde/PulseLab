@@ -161,6 +161,12 @@ public final class AudioEngine {
         if (p == null) return beatHz;
         return p.at(generatorElapsedMs() / 1000.0).frequencyHz;
     }
+    public double currentCarrierHz() {
+        VectorProgram p = vector;
+        if (p == null) return carrierHz;
+        double value = p.at(generatorElapsedMs() / 1000.0).carrierHz;
+        return Double.isNaN(value) ? carrierHz : value;
+    }
 
     public void configureGenerator(boolean binauralMode, double carrier, double beat,
                                    float volume, Noise noiseType, float noiseLevel) {
@@ -189,6 +195,7 @@ public final class AudioEngine {
     private void render(short[] pcm) {
         boolean renderGenerator = generatorActive && !generatorPaused;
         double bufferDelta = beatHz;
+        double bufferCarrier = carrierHz;
         if (renderGenerator) {
             long elapsed = generatorElapsedMs();
             if (sessionLimitMs > 0 && elapsed >= sessionLimitMs) {
@@ -203,22 +210,23 @@ public final class AudioEngine {
                     renderGenerator = false;
                 } else {
                     bufferDelta = position.frequencyHz;
+                    if (!Double.isNaN(position.carrierHz)) bufferCarrier = position.carrierHz;
                 }
             }
         }
         for (int frame = 0; frame < FRAMES; frame++) {
             double left = 0, right = 0;
             if (renderGenerator) {
-                double delta = Math.min(bufferDelta, carrierHz / 2.0);
+                double delta = Math.min(bufferDelta, bufferCarrier / 2.0);
                 if (binaural) {
-                    double fL = Math.max(0.1, carrierHz - delta / 2.0);
-                    double fR = Math.max(0.1, carrierHz + delta / 2.0);
+                    double fL = Math.max(0.1, bufferCarrier - delta / 2.0);
+                    double fR = Math.max(0.1, bufferCarrier + delta / 2.0);
                     phaseLeft = wrap(phaseLeft + twoPi(fL));
                     phaseRight = wrap(phaseRight + twoPi(fR));
                     left += Math.sin(phaseLeft) * generatorVolume;
                     right += Math.sin(phaseRight) * generatorVolume;
                 } else {
-                    monoPhase = wrap(monoPhase + twoPi(carrierHz));
+                    monoPhase = wrap(monoPhase + twoPi(bufferCarrier));
                     double sample = Math.sin(monoPhase) * generatorVolume;
                     left += sample;
                     right += sample;

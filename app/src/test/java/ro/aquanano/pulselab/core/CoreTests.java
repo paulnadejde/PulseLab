@@ -28,6 +28,12 @@ public final class CoreTests {
         assert v.at(11).transition;
         assert Math.abs(v.at(11).phaseElapsedSeconds - 1) < 1e-9;
         assert v.at(18).finished;
+
+        String csv4 = "duration_seconds,carrier_hz,frequency_hz,transition_seconds\n"
+                + "10,200,10,2\n5,220,6,0\n";
+        VectorProgram v4 = VectorProgram.parseCsv(new StringReader(csv4));
+        assert Math.abs(v4.at(11).carrierHz - 210) < 1e-9;
+        assert Math.abs(v4.at(11).frequencyHz - 8) < 1e-9;
         System.out.println("Core tests passed");
     }
 }

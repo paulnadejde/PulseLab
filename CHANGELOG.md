@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5
+
+- adaugă purtătoarea `f0` în formatul vectorial cu patru coloane;
+- interpolează simultan `f0` și `fm` între etape;
+- păstrează compatibilitatea cu CSV-urile vechi cu trei coloane, care folosesc purtătoarea din dial;
+- actualizează ambele dialuri și diagnosticul vectorial în timpul rulării;
+- corectează inițializarea și resetarea etichetei PAUZĂ/REIA.
+
 ## 0.1.4
 
 - corectează păstrarea bifei vectoriale după import și activează automat vectorul încărcat;

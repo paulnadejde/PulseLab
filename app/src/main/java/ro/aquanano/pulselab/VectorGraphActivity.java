@@ -30,6 +30,7 @@ import ro.aquanano.pulselab.core.VectorProgram;
 /** Full-screen, landscape diagnostic view for a frequency vector. */
 public final class VectorGraphActivity extends Activity {
     public static final String EXTRA_DURATIONS = "vector_durations";
+    public static final String EXTRA_CARRIERS = "vector_carriers";
     public static final String EXTRA_FREQUENCIES = "vector_frequencies";
     public static final String EXTRA_TRANSITIONS = "vector_transitions";
 
@@ -111,7 +112,11 @@ public final class VectorGraphActivity extends Activity {
             double elapsed = Math.min(program.totalSeconds(), elapsedMs / 1000.0);
             VectorProgram.Position p = program.at(elapsed);
             graph.setCursorSeconds(elapsed);
-            frequency.setText(String.format(Locale.US, "%.2f Hz", p.frequencyHz));
+            double f0 = Double.isNaN(p.carrierHz) && bound
+                ? audioService.engine().currentCarrierHz() : p.carrierHz;
+            frequency.setText(Double.isNaN(f0)
+                ? String.format(Locale.US, "fm %.2f Hz", p.frequencyHz)
+                : String.format(Locale.US, "f0 %.1f Hz  •  fm %.2f Hz", f0, p.frequencyHz));
             String monoNote = bound && !audioService.engine().isBinaural()
                 ? " • monoaural: fm nu intră în audio" : "";
             stage.setText(String.format(Locale.US, "Etapa %d/%d • %s • %s / %s%s",
@@ -123,12 +128,16 @@ public final class VectorGraphActivity extends Activity {
 
     private VectorProgram readProgram(Intent intent) {
         double[] d = intent.getDoubleArrayExtra(EXTRA_DURATIONS);
+        double[] c = intent.getDoubleArrayExtra(EXTRA_CARRIERS);
         double[] f = intent.getDoubleArrayExtra(EXTRA_FREQUENCIES);
         double[] t = intent.getDoubleArrayExtra(EXTRA_TRANSITIONS);
         if (d == null || f == null || t == null || d.length == 0 || d.length != f.length || d.length != t.length)
             return null;
         List<VectorProgram.Step> steps = new ArrayList<>();
-        for (int i = 0; i < d.length; i++) steps.add(new VectorProgram.Step(d[i], f[i], t[i]));
+        for (int i = 0; i < d.length; i++) {
+            double carrier = c != null && c.length == d.length ? c[i] : Double.NaN;
+            steps.add(new VectorProgram.Step(d[i], carrier, f[i], t[i]));
+        }
         return new VectorProgram(steps);
     }
 
@@ -151,6 +160,7 @@ public final class VectorGraphActivity extends Activity {
         private final VectorProgram program;
         private final Paint axis = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint curve = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint carrierCurve = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint cursor = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
         private double cursorSeconds;
@@ -163,6 +173,9 @@ public final class VectorGraphActivity extends Activity {
             curve.setColor(Color.rgb(69, 214, 196));
             curve.setStyle(Paint.Style.STROKE);
             curve.setStrokeWidth(5);
+            carrierCurve.setColor(Color.rgb(185, 103, 214));
+            carrierCurve.setStyle(Paint.Style.STROKE);
+            carrierCurve.setStrokeWidth(5);
             cursor.setColor(Color.rgb(255, 196, 48));
             cursor.setStrokeWidth(3);
             text.setColor(Color.WHITE);
@@ -176,7 +189,7 @@ public final class VectorGraphActivity extends Activity {
 
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            float left = 70, top = 85, right = getWidth() - 35, bottom = getHeight() - 55;
+            float left = 85, top = 85, right = getWidth() - 125, bottom = getHeight() - 55;
             if (right <= left || bottom <= top) return;
             canvas.drawLine(left, bottom, right, bottom, axis);
             canvas.drawLine(left, top, left, bottom, axis);
@@ -206,13 +219,54 @@ public final class VectorGraphActivity extends Activity {
             }
             canvas.drawPath(path, curve);
 
+            boolean hasCarrier = true;
+            double carrierMin = Double.MAX_VALUE, carrierMax = -Double.MAX_VALUE;
+            for (VectorProgram.Step s : program.steps()) {
+                if (Double.isNaN(s.carrierHz)) { hasCarrier = false; break; }
+                carrierMin = Math.min(carrierMin, s.carrierHz);
+                carrierMax = Math.max(carrierMax, s.carrierHz);
+            }
+            if (hasCarrier) {
+                if (carrierMax - carrierMin < 0.01) { carrierMin -= 1; carrierMax += 1; }
+                double carrierMargin = (carrierMax - carrierMin) * 0.12;
+                carrierMin = Math.max(0, carrierMin - carrierMargin);
+                carrierMax += carrierMargin;
+                canvas.drawLine(right, top, right, bottom, axis);
+                Path carrierPath = new Path();
+                time = 0;
+                carrierPath.moveTo(x(0, left, right),
+                    y(first.carrierHz, carrierMin, carrierMax, top, bottom));
+                for (int i = 0; i < program.steps().size(); i++) {
+                    VectorProgram.Step s = program.steps().get(i);
+                    time += s.durationSeconds;
+                    carrierPath.lineTo(x(time, left, right),
+                        y(s.carrierHz, carrierMin, carrierMax, top, bottom));
+                    double nextCarrier = i + 1 < program.steps().size()
+                        ? program.steps().get(i + 1).carrierHz : s.carrierHz;
+                    time += s.transitionSeconds;
+                    carrierPath.lineTo(x(time, left, right),
+                        y(nextCarrier, carrierMin, carrierMax, top, bottom));
+                }
+                canvas.drawPath(carrierPath, carrierCurve);
+                canvas.drawText(String.format(Locale.US, "%.1f", carrierMax), right + 8, top + 10, text);
+                canvas.drawText(String.format(Locale.US, "%.1f", carrierMin), right + 8, bottom, text);
+                text.setColor(Color.rgb(185, 103, 214));
+                canvas.drawText("f0", right + 8, top + 42, text);
+                text.setColor(Color.WHITE);
+            }
+
             VectorProgram.Position p = program.at(cursorSeconds);
             float cx = x(cursorSeconds, left, right);
             float cy = y(p.frequencyHz, min, max, top, bottom);
             canvas.drawLine(cx, top, cx, bottom, cursor);
             canvas.drawCircle(cx, cy, 9, cursor);
+            if (hasCarrier && !Double.isNaN(p.carrierHz))
+                canvas.drawCircle(cx, y(p.carrierHz, carrierMin, carrierMax, top, bottom), 9, cursor);
             canvas.drawText(String.format(Locale.US, "%.2f Hz", max), 6, top + 10, text);
             canvas.drawText(String.format(Locale.US, "%.2f Hz", min), 6, bottom, text);
+            text.setColor(Color.rgb(69, 214, 196));
+            canvas.drawText("fm", 6, top + 42, text);
+            text.setColor(Color.WHITE);
             canvas.drawText("0", left, getHeight() - 14, text);
             String end = formatTime(program.totalSeconds());
             canvas.drawText(end, right - text.measureText(end), getHeight() - 14, text);

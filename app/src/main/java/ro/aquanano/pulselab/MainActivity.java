@@ -343,19 +343,26 @@ public final class MainActivity extends Activity {
 
         LinearLayout run = horizontal();
         Button start = button("START");
-        Button pause = button(audioService.engine().isGeneratorPaused() ? "REIA" : "PAUZĂ");
+        Button pause = button(audioService.engine().isGeneratorActive() && audioService.engine().isGeneratorPaused()
+            ? "REIA" : "PAUZĂ");
         Button stop = button("STOP");
         run.addView(start, weighted());
         run.addView(pause, weighted());
         run.addView(stop, weighted());
         content.addView(run);
-        start.setOnClickListener(v -> startGenerator());
+        start.setOnClickListener(v -> {
+            startGenerator();
+            pause.setText("PAUZĂ");
+        });
         pause.setOnClickListener(v -> {
             audioService.engine().toggleGeneratorPause();
             audioService.pauseMusic(audioService.engine().isGeneratorPaused());
             pause.setText(audioService.engine().isGeneratorPaused() ? "REIA" : "PAUZĂ");
         });
-        stop.setOnClickListener(v -> stopGenerator());
+        stop.setOnClickListener(v -> {
+            stopGenerator();
+            pause.setText("PAUZĂ");
+        });
         generatorTimer = text("Sesiune: 00:00 / 00:00", 20);
         generatorTimer.setGravity(Gravity.CENTER);
         content.addView(generatorTimer);
@@ -545,14 +552,18 @@ public final class MainActivity extends Activity {
         if (position == null || program == null) return;
         if (Math.abs(beatDial.getValue() - position.frequencyHz) >= 0.005)
             beatDial.setValue(position.frequencyHz);
+        if (!Double.isNaN(position.carrierHz)
+                && Math.abs(carrierDial.getValue() - position.carrierHz) >= 0.05)
+            carrierDial.setValue(position.carrierHz);
         String phase = position.transition ? "tranziție" : "menținere";
         String monoNote = engine.isBinaural() ? "" : " • fm neaplicat audio în monoaural";
+        double currentCarrier = Double.isNaN(position.carrierHz) ? engine.currentCarrierHz() : position.carrierHz;
         vectorStage.setText(String.format(Locale.US,
-            "VECTOR ACTIV • Etapa %d/%d • %s %s / %s • %.2f Hz%s",
+            "VECTOR ACTIV • Etapa %d/%d • %s %s / %s • f0 %.1f Hz • fm %.2f Hz%s",
             position.stepIndex + 1, program.steps().size(), phase,
             formatTime(Math.round(position.phaseElapsedSeconds * 1000)),
             formatTime(Math.round(position.phaseDurationSeconds * 1000)),
-            position.frequencyHz, monoNote));
+            currentCarrier, position.frequencyHz, monoNote));
     }
 
     private void showVectorGraph() {
@@ -560,15 +571,18 @@ public final class MainActivity extends Activity {
         int count = loadedVector.steps().size();
         double[] durations = new double[count];
         double[] frequencies = new double[count];
+        double[] carriers = new double[count];
         double[] transitions = new double[count];
         for (int i = 0; i < count; i++) {
             VectorProgram.Step step = loadedVector.steps().get(i);
             durations[i] = step.durationSeconds;
+            carriers[i] = step.carrierHz;
             frequencies[i] = step.frequencyHz;
             transitions[i] = step.transitionSeconds;
         }
         Intent graph = new Intent(this, VectorGraphActivity.class);
         graph.putExtra(VectorGraphActivity.EXTRA_DURATIONS, durations);
+        graph.putExtra(VectorGraphActivity.EXTRA_CARRIERS, carriers);
         graph.putExtra(VectorGraphActivity.EXTRA_FREQUENCIES, frequencies);
         graph.putExtra(VectorGraphActivity.EXTRA_TRANSITIONS, transitions);
         startActivity(graph);

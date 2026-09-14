@@ -51,15 +51,17 @@ Separatorul poate fi virgulă sau punct și virgulă. Separatorul zecimal este
 punctul. Antetul este opțional.
 
 ```csv
-duration_seconds,frequency_hz,transition_seconds
-300,10.00,30
-600,7.83,60
-300,4.00,0
+duration_seconds,carrier_hz,frequency_hz,transition_seconds
+300,220.0,10.00,30
+600,200.0,7.83,60
+300,180.0,4.00,0
 ```
 
-Fiecare rând menține frecvența pentru `duration_seconds`, apoi face o tranziție
-liniară către frecvența rândului următor în `transition_seconds`. Tranziția
-ultimului rând este inclusă în durata totală și menține ultima frecvență.
+Fiecare rând menține purtătoarea `carrier_hz` (`f0`) și frecvența de diferență
+`frequency_hz` (`fm`) pentru `duration_seconds`, apoi face o tranziție liniară
+către ambele valori ale rândului următor în `transition_seconds`. CSV-urile
+vechi cu trei coloane rămân acceptate și folosesc purtătoarea selectată din dial.
+Tranziția ultimului rând este inclusă în durata totală și menține ultimele valori.
 
 ## Construire
 

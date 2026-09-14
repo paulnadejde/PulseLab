@@ -11,19 +11,28 @@ import java.util.Locale;
 public final class VectorProgram {
     public static final class Step {
         public final double durationSeconds;
+        /** NaN means: use the carrier selected in the dial (legacy 3-column CSV). */
+        public final double carrierHz;
         public final double frequencyHz;
         public final double transitionSeconds;
 
         public Step(double durationSeconds, double frequencyHz, double transitionSeconds) {
-            if (durationSeconds < 0 || frequencyHz < 0 || transitionSeconds < 0)
-                throw new IllegalArgumentException("Negative vector value");
+            this(durationSeconds, Double.NaN, frequencyHz, transitionSeconds);
+        }
+
+        public Step(double durationSeconds, double carrierHz, double frequencyHz, double transitionSeconds) {
+            if (durationSeconds < 0 || (!Double.isNaN(carrierHz) && carrierHz <= 0)
+                    || frequencyHz < 0 || transitionSeconds < 0)
+                throw new IllegalArgumentException("Invalid vector value");
             this.durationSeconds = durationSeconds;
+            this.carrierHz = carrierHz;
             this.frequencyHz = frequencyHz;
             this.transitionSeconds = transitionSeconds;
         }
     }
 
     public static final class Position {
+        public final double carrierHz;
         public final double frequencyHz;
         public final boolean finished;
         public final int stepIndex;
@@ -31,8 +40,9 @@ public final class VectorProgram {
         public final double phaseElapsedSeconds;
         public final double phaseDurationSeconds;
 
-        public Position(double frequencyHz, boolean finished, int stepIndex, boolean transition,
+        public Position(double carrierHz, double frequencyHz, boolean finished, int stepIndex, boolean transition,
                         double phaseElapsedSeconds, double phaseDurationSeconds) {
+            this.carrierHz = carrierHz;
             this.frequencyHz = frequencyHz;
             this.finished = finished;
             this.stepIndex = stepIndex;
@@ -59,26 +69,29 @@ public final class VectorProgram {
     public Position at(double seconds) {
         if (seconds <= 0) {
             Step first = steps.get(0);
-            return new Position(first.frequencyHz, false, 0, false, 0, first.durationSeconds);
+            return new Position(first.carrierHz, first.frequencyHz, false, 0, false, 0, first.durationSeconds);
         }
         double cursor = 0;
         for (int i = 0; i < steps.size(); i++) {
             Step s = steps.get(i);
             if (seconds < cursor + s.durationSeconds)
-                return new Position(s.frequencyHz, false, i, false,
+                return new Position(s.carrierHz, s.frequencyHz, false, i, false,
                     seconds - cursor, s.durationSeconds);
             cursor += s.durationSeconds;
             if (seconds < cursor + s.transitionSeconds) {
                 double next = i + 1 < steps.size() ? steps.get(i + 1).frequencyHz : s.frequencyHz;
+                double nextCarrier = i + 1 < steps.size() ? steps.get(i + 1).carrierHz : s.carrierHz;
                 double p = s.transitionSeconds == 0 ? 1 : (seconds - cursor) / s.transitionSeconds;
-                return new Position(s.frequencyHz + (next - s.frequencyHz) * p, false, i, true,
+                double carrier = Double.isNaN(s.carrierHz) || Double.isNaN(nextCarrier)
+                    ? Double.NaN : s.carrierHz + (nextCarrier - s.carrierHz) * p;
+                return new Position(carrier, s.frequencyHz + (next - s.frequencyHz) * p, false, i, true,
                     seconds - cursor, s.transitionSeconds);
             }
             cursor += s.transitionSeconds;
         }
         int lastIndex = steps.size() - 1;
         Step last = steps.get(lastIndex);
-        return new Position(last.frequencyHz, true, lastIndex, last.transitionSeconds > 0,
+        return new Position(last.carrierHz, last.frequencyHz, true, lastIndex, last.transitionSeconds > 0,
             last.transitionSeconds > 0 ? last.transitionSeconds : last.durationSeconds,
             last.transitionSeconds > 0 ? last.transitionSeconds : last.durationSeconds);
     }
@@ -102,10 +115,17 @@ public final class VectorProgram {
                 }
                 firstRecord = false;
                 try {
-                    double duration = Double.parseDouble(p[0].trim());
-                    double frequency = Double.parseDouble(p[1].trim());
-                    double transition = Double.parseDouble(p[2].trim());
-                    result.add(new Step(duration, frequency, transition));
+                    double duration = Double.parseDouble(p[0].replace("\uFEFF", "").trim());
+                    if (p.length >= 4) {
+                        double carrier = Double.parseDouble(p[1].trim());
+                        double frequency = Double.parseDouble(p[2].trim());
+                        double transition = Double.parseDouble(p[3].trim());
+                        result.add(new Step(duration, carrier, frequency, transition));
+                    } else {
+                        double frequency = Double.parseDouble(p[1].trim());
+                        double transition = Double.parseDouble(p[2].trim());
+                        result.add(new Step(duration, frequency, transition));
+                    }
                 } catch (NumberFormatException e) {
                     throw new IOException("CSV line " + lineNo + ": invalid number", e);
                 }
