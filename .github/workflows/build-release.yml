@@ -12,6 +12,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: PulseLab
     env:
       PULSELAB_KEYSTORE_BASE64: ${{ secrets.PULSELAB_KEYSTORE_BASE64 }}
       PULSELAB_STORE_PASSWORD: ${{ secrets.PULSELAB_STORE_PASSWORD }}
