@@ -78,6 +78,10 @@ include binarul `gradle-wrapper.jar`; acesta poate fi generat local cu
 Fișierul `.github/workflows/build-apk.yml` construiește automat același APK la
 fiecare actualizare a ramurii `main` sau la pornirea manuală a workflow-ului.
 
+Workflow-ul `build-release.yml` construiește separat un APK release semnat cu
+cheia permanentă din GitHub Actions Secrets. Pornirea manuală produce un
+artifact privat; publicarea unui tag `v*` creează și un GitHub Release.
+
 ## Observații 0.1
 
 - Clickul și clopoțelul sunt sintetizate intern. Încărcarea unor WAV-uri

@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
 }
 
+val releaseKeystorePath = System.getenv("PULSELAB_KEYSTORE_PATH")
+
 android {
     namespace = "ro.aquanano.pulselab"
     compileSdk = 34
@@ -14,9 +16,23 @@ android {
         versionName = "0.1.2"
     }
 
+    signingConfigs {
+        if (releaseKeystorePath != null) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = System.getenv("PULSELAB_STORE_PASSWORD")
+                keyAlias = System.getenv("PULSELAB_KEY_ALIAS")
+                keyPassword = System.getenv("PULSELAB_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseKeystorePath != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

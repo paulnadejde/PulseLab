@@ -1,0 +1,57 @@
+name: Build signed Android release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PULSELAB_KEYSTORE_BASE64: ${{ secrets.PULSELAB_KEYSTORE_BASE64 }}
+      PULSELAB_STORE_PASSWORD: ${{ secrets.PULSELAB_STORE_PASSWORD }}
+      PULSELAB_KEY_ALIAS: ${{ secrets.PULSELAB_KEY_ALIAS }}
+      PULSELAB_KEY_PASSWORD: ${{ secrets.PULSELAB_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Restore signing key
+        shell: bash
+        run: |
+          test -n "$PULSELAB_KEYSTORE_BASE64"
+          test -n "$PULSELAB_STORE_PASSWORD"
+          test -n "$PULSELAB_KEY_ALIAS"
+          test -n "$PULSELAB_KEY_PASSWORD"
+          printf '%s' "$PULSELAB_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/PulseLab-release.jks"
+          echo "PULSELAB_KEYSTORE_PATH=$RUNNER_TEMP/PulseLab-release.jks" >> "$GITHUB_ENV"
+      - name: Build signed release APK
+        run: gradle :app:assembleRelease
+      - name: Name APK
+        id: package
+        shell: bash
+        run: |
+          VERSION_NAME=$(sed -nE 's/.*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts)
+          APK_PATH="PulseLab-${VERSION_NAME}-release.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$APK_PATH"
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PulseLab-signed-release-apk
+          path: ${{ steps.package.outputs.apk_path }}
+          if-no-files-found: error
+      - name: Publish GitHub Release for tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK_PATH: ${{ steps.package.outputs.apk_path }}
+        run: gh release create "$GITHUB_REF_NAME" "$APK_PATH" --generate-notes --title "PulseLab $GITHUB_REF_NAME"
