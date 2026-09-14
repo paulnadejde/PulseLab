@@ -15,10 +15,14 @@ import org.json.JSONObject;
 
 import java.net.URL;
 
-/** Online catalog; downloaded content remains available through PresetStore. */
+/** Independent online lists for vectors and audio; downloads remain local. */
 public final class PresetCatalogActivity extends Activity {
     public static final String RESULT_PRESET_ID = "downloaded_preset_id";
-    private static final String CATALOG = "https://aquanano.eu/aquaweb/aquaritm/catalog.json";
+    public static final String RESULT_RESOURCE_TYPE = "downloaded_resource_type";
+    public static final String TYPE_VECTOR = "vector";
+    public static final String TYPE_AUDIO = "audio";
+    private static final String CATALOG =
+        "https://aquanano.eu/aquaweb/aquaritm/catalog_aquaritm.php";
     private LinearLayout list;
 
     @Override protected void onCreate(Bundle state) {
@@ -27,11 +31,10 @@ public final class PresetCatalogActivity extends Activity {
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(14), dp(12), dp(14), dp(14));
         page.setBackgroundColor(Color.BLACK);
-        TextView title = text("Catalog AquaRitm", 24);
+        TextView title = text("Biblioteca AquaRitm", 24);
         title.setTextColor(Color.rgb(69, 214, 196));
         page.addView(title);
-        TextView note = text("Preseturile descărcate rămân disponibile offline.", 15);
-        page.addView(note);
+        page.addView(text("Vectorii și sunetele se descarcă separat și rămân disponibile offline.", 15));
         ScrollView scroll = new ScrollView(this);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
@@ -51,46 +54,68 @@ public final class PresetCatalogActivity extends Activity {
             try {
                 URL catalogUrl = new URL(CATALOG);
                 JSONObject root = new JSONObject(PresetStore.fetchCatalog(catalogUrl));
-                JSONArray presets = root.getJSONArray("presets");
-                runOnUiThread(() -> showCatalog(presets, catalogUrl));
+                JSONArray vectors = root.optJSONArray("vectors");
+                JSONArray audio = root.optJSONArray("audio");
+                if (vectors == null) vectors = new JSONArray();
+                if (audio == null) audio = new JSONArray();
+                JSONArray finalVectors = vectors;
+                JSONArray finalAudio = audio;
+                runOnUiThread(() -> showCatalog(finalVectors, finalAudio, catalogUrl));
             } catch (Exception e) {
-                runOnUiThread(() -> showError("Catalog indisponibil: " + e.getMessage()));
+                runOnUiThread(() -> showError("Catalog indisponibil: " + e.getMessage(), true));
             }
         }, "AquaRitmCatalog").start();
     }
 
-    private void showCatalog(JSONArray presets, URL catalogUrl) {
+    private void showCatalog(JSONArray vectors, JSONArray audio, URL catalogUrl) {
         list.removeAllViews();
-        if (presets.length() == 0) { list.addView(text("Catalogul este gol.", 17)); return; }
-        for (int i = 0; i < presets.length(); i++) {
-            JSONObject item = presets.optJSONObject(i);
+        addSection("VECTORI", vectors, TYPE_VECTOR, catalogUrl);
+        addSection("SUNETE", audio, TYPE_AUDIO, catalogUrl);
+    }
+
+    private void addSection(String title, JSONArray items, String type, URL catalogUrl) {
+        TextView heading = text(title, 20);
+        heading.setTextColor(Color.rgb(69, 214, 196));
+        list.addView(heading);
+        if (items.length() == 0) {
+            list.addView(text("Niciun fișier disponibil.", 15));
+            return;
+        }
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
             if (item == null) continue;
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(dp(10), dp(12), dp(10), dp(12));
-            TextView name = text(item.optString("name", "Preset"), 20);
-            name.setTextColor(Color.rgb(69, 214, 196));
-            card.addView(name);
+            card.setPadding(dp(10), dp(8), dp(10), dp(12));
+            card.addView(text(item.optString("name", "Fișier"), 18));
             String description = item.optString("description", "");
             if (!description.isEmpty()) card.addView(text(description, 14));
             Button download = new Button(this);
-            boolean installed = PresetStore.find(this, item.optString("id")) != null;
+            boolean installed = TYPE_VECTOR.equals(type)
+                ? PresetStore.find(this, item.optString("id")) != null
+                : PresetStore.findAudio(this, item.optString("id")) != null;
             download.setText(installed ? "ACTUALIZEAZĂ" : "DESCARCĂ");
-            download.setOnClickListener(v -> download(item, catalogUrl, download));
+            download.setOnClickListener(v -> download(item, type, catalogUrl, download));
             card.addView(download);
             list.addView(card);
         }
     }
 
-    private void download(JSONObject item, URL catalogUrl, Button button) {
+    private void download(JSONObject item, String type, URL catalogUrl, Button button) {
         button.setEnabled(false);
         button.setText("DESCARC…");
         new Thread(() -> {
             try {
-                PresetStore.LocalPreset preset = PresetStore.download(this, item, catalogUrl);
+                String id;
+                if (TYPE_AUDIO.equals(type))
+                    id = PresetStore.downloadAudio(this, item, catalogUrl).id;
+                else
+                    id = PresetStore.download(this, item, catalogUrl).id;
+                String resultId = id;
                 runOnUiThread(() -> {
                     Intent result = new Intent();
-                    result.putExtra(RESULT_PRESET_ID, preset.id);
+                    result.putExtra(RESULT_PRESET_ID, resultId);
+                    result.putExtra(RESULT_RESOURCE_TYPE, type);
                     setResult(RESULT_OK, result);
                     finish();
                 });
@@ -98,13 +123,14 @@ public final class PresetCatalogActivity extends Activity {
                 runOnUiThread(() -> {
                     button.setEnabled(true);
                     button.setText("REÎNCEARCĂ");
-                    showError("Descărcare eșuată: " + e.getMessage());
+                    showError("Descărcare eșuată: " + e.getMessage(), false);
                 });
             }
         }, "AquaRitmDownload").start();
     }
 
-    private void showError(String value) {
+    private void showError(String value, boolean clear) {
+        if (clear) list.removeAllViews();
         TextView error = text(value, 15);
         error.setTextColor(Color.rgb(255, 105, 105));
         list.addView(error, 0);
@@ -120,5 +146,7 @@ public final class PresetCatalogActivity extends Activity {
         return view;
     }
 
-    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
 }

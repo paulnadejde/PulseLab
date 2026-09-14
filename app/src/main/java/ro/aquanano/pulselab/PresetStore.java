@@ -40,6 +40,20 @@ public final class PresetStore {
         }
     }
 
+    public static final class LocalAudio {
+        public final String id;
+        public final String name;
+        public final String description;
+        public final File audioFile;
+
+        LocalAudio(String id, String name, String description, File audioFile) {
+            this.id = id;
+            this.name = name;
+            this.description = description;
+            this.audioFile = audioFile;
+        }
+    }
+
     private PresetStore() { }
 
     public static List<LocalPreset> list(Context context) {
@@ -65,6 +79,56 @@ public final class PresetStore {
         if (id == null) return null;
         for (LocalPreset preset : list(context)) if (id.equals(preset.id)) return preset;
         return null;
+    }
+
+
+    public static List<LocalAudio> listAudio(Context context) {
+        File directory = new File(root(context), "_audio");
+        File[] dirs = directory.listFiles(File::isDirectory);
+        if (dirs == null) return Collections.emptyList();
+        List<LocalAudio> result = new ArrayList<>();
+        for (File dir : dirs) {
+            try {
+                JSONObject metadata = new JSONObject(readText(new File(dir, "metadata.json"), 1_000_000));
+                File audio = new File(dir, metadata.getString("audio_file"));
+                if (!audio.isFile()) continue;
+                result.add(new LocalAudio(metadata.getString("id"), metadata.getString("name"),
+                    metadata.optString("description", ""), audio));
+            } catch (Exception ignored) { }
+        }
+        result.sort(Comparator.comparing(a -> a.name.toLowerCase(Locale.ROOT)));
+        return result;
+    }
+
+    public static LocalAudio findAudio(Context context, String id) {
+        if (id == null) return null;
+        for (LocalAudio audio : listAudio(context)) if (id.equals(audio.id)) return audio;
+        return null;
+    }
+
+    public static LocalAudio downloadAudio(Context context, JSONObject item, URL catalogUrl) throws Exception {
+        String id = item.getString("id");
+        if (!id.matches("[A-Za-z0-9._-]{1,80}")) throw new Exception("ID sunet invalid");
+        String name = item.getString("name");
+        String description = item.optString("description", "");
+        URL audioUrl = checkedUrl(catalogUrl, item.getString("audio"));
+        String remoteName = new File(audioUrl.getPath()).getName();
+        String extension = remoteName.contains(".") ? remoteName.substring(remoteName.lastIndexOf('.')) : ".audio";
+        if (!extension.matches("\\.[A-Za-z0-9]{1,8}")) extension = ".audio";
+        String audioName = "audio" + extension.toLowerCase(Locale.ROOT);
+
+        File directory = new File(new File(root(context), "_audio"), id);
+        if (!directory.exists() && !directory.mkdirs()) throw new Exception("Nu pot crea directorul local");
+        File audio = new File(directory, audioName);
+        downloadFile(audioUrl, audio, MAX_AUDIO_BYTES, item.optString("audio_sha256", ""));
+
+        JSONObject metadata = new JSONObject();
+        metadata.put("id", id);
+        metadata.put("name", name);
+        metadata.put("description", description);
+        metadata.put("audio_file", audioName);
+        writeText(new File(directory, "metadata.json"), metadata.toString(2));
+        return new LocalAudio(id, name, description, audio);
     }
 
     public static LocalPreset download(Context context, JSONObject item, URL catalogUrl) throws Exception {

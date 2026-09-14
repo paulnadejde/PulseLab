@@ -87,6 +87,8 @@ public final class MainActivity extends Activity {
     private TextView vectorStage;
     private Spinner downloadedPreset;
     private List<PresetStore.LocalPreset> downloadedPresets;
+    private Spinner downloadedAudio;
+    private List<PresetStore.LocalAudio> downloadedAudioFiles;
     private VectorProgram loadedVector;
     private boolean useVector;
     private Uri musicUri;
@@ -310,6 +312,20 @@ public final class MainActivity extends Activity {
         Button chooseMusic = button("Alege piesă muzicală (buclă)");
         chooseMusic.setOnClickListener(v -> pickFile(PICK_MUSIC, "audio/*"));
         content.addView(chooseMusic);
+        downloadedAudioFiles = PresetStore.listAudio(this);
+        String[] audioLabels = downloadedAudioFiles.isEmpty()
+            ? new String[]{"Niciun sunet descărcat"}
+            : downloadedAudioFiles.stream().map(a -> a.name).toArray(String[]::new);
+        downloadedAudio = spinner(audioLabels);
+        content.addView(downloadedAudio);
+        Button loadAudio = button("ÎNCARCĂ SUNET LOCAL");
+        loadAudio.setEnabled(!downloadedAudioFiles.isEmpty());
+        loadAudio.setAlpha(downloadedAudioFiles.isEmpty() ? 0.4f : 1f);
+        loadAudio.setOnClickListener(v -> {
+            if (!downloadedAudioFiles.isEmpty())
+                loadDownloadedAudio(downloadedAudioFiles.get(downloadedAudio.getSelectedItemPosition()));
+        });
+        content.addView(loadAudio);
 
         title("Sesiune");
         sessionMinutes = decimal("20");
@@ -515,8 +531,14 @@ public final class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == PICK_ONLINE_PRESET && resultCode == RESULT_OK && data != null) {
             String id = data.getStringExtra(PresetCatalogActivity.RESULT_PRESET_ID);
-            PresetStore.LocalPreset preset = PresetStore.find(this, id);
-            if (preset != null) loadDownloadedPreset(preset);
+            String type = data.getStringExtra(PresetCatalogActivity.RESULT_RESOURCE_TYPE);
+            if (PresetCatalogActivity.TYPE_AUDIO.equals(type)) {
+                PresetStore.LocalAudio audio = PresetStore.findAudio(this, id);
+                if (audio != null) loadDownloadedAudio(audio);
+            } else {
+                PresetStore.LocalPreset preset = PresetStore.find(this, id);
+                if (preset != null) loadDownloadedPreset(preset);
+            }
             return;
         }
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
@@ -535,6 +557,13 @@ public final class MainActivity extends Activity {
             audioService.setMusic(uri, 0.2f);
             toast("Piesă selectată");
         }
+    }
+
+    private void loadDownloadedAudio(PresetStore.LocalAudio audio) {
+        musicUri = Uri.fromFile(audio.audioFile);
+        audioService.setMusic(musicUri, 0.2f);
+        toast("Sunet local selectat: " + audio.name);
+        renderCurrentScreen();
     }
 
     private void loadDownloadedPreset(PresetStore.LocalPreset preset) {

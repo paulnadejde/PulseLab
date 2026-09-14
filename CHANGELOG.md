@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7
+
+- folosește `catalog_aquaritm.php`, generat automat din directoarele Web Disk;
+- separă complet biblioteca de vectori de biblioteca de sunete;
+- salvează și selectează independent vectorii și piesele pentru utilizare offline.
+
+
 ## 0.1.6
 
 - adaugă un catalog online pentru vectori și piese audio opționale;

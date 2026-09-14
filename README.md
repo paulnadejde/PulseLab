@@ -42,7 +42,7 @@ selectorul Android, iar aplicația primește acces numai la fișierele alese exp
 - zgomot alb, roz sau brun cu volum separat;
 - piesă audio aleasă de utilizator și reluată în buclă;
 - sesiune constantă temporizată sau vector CSV;
-- catalog online opțional, cu preseturi și piese salvate local pentru utilizare offline;
+- catalog online opțional, cu liste independente de vectori și sunete, salvate local pentru utilizare offline;
 - Start, Pauză/Reluare și Stop, cu oprirea semnalului suprapus;
 - stroboscop sinusoidal alb, roșu, verde, albastru sau chihlimbar;
 - avertisment la activarea stroboscopului;
