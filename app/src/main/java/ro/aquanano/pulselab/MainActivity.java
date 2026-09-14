@@ -42,6 +42,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.InputStreamReader;
+import java.io.FileReader;
+import java.util.List;
 import java.util.Locale;
 
 import ro.aquanano.pulselab.core.MetronomeLogic;
@@ -50,6 +52,7 @@ import ro.aquanano.pulselab.core.VectorProgram;
 public final class MainActivity extends Activity {
     private static final int PICK_VECTOR = 1001;
     private static final int PICK_MUSIC = 1002;
+    private static final int PICK_ONLINE_PRESET = 1003;
     private static final int ACCENT = Color.rgb(69, 214, 196);
     private static final int PANEL = Color.rgb(21, 21, 21);
 
@@ -82,6 +85,8 @@ public final class MainActivity extends Activity {
     private CheckBox vectorMode;
     private TextView vectorLabel;
     private TextView vectorStage;
+    private Spinner downloadedPreset;
+    private List<PresetStore.LocalPreset> downloadedPresets;
     private VectorProgram loadedVector;
     private boolean useVector;
     private Uri musicUri;
@@ -331,6 +336,27 @@ public final class MainActivity extends Activity {
         showVectorGraph.setOnClickListener(v -> showVectorGraph());
         content.addView(showVectorGraph);
 
+        title("Preseturi vectoriale descărcate");
+        downloadedPresets = PresetStore.list(this);
+        String[] localLabels = downloadedPresets.isEmpty() ? new String[]{"Niciun preset descărcat"} :
+            downloadedPresets.stream().map(p -> p.name).toArray(String[]::new);
+        downloadedPreset = spinner(localLabels);
+        content.addView(downloadedPreset);
+        LinearLayout libraryButtons = horizontal();
+        Button catalog = button("CATALOG ONLINE");
+        Button loadLocal = button("ÎNCARCĂ LOCAL");
+        loadLocal.setEnabled(!downloadedPresets.isEmpty());
+        loadLocal.setAlpha(downloadedPresets.isEmpty() ? 0.4f : 1f);
+        catalog.setOnClickListener(v -> startActivityForResult(
+            new Intent(this, PresetCatalogActivity.class), PICK_ONLINE_PRESET));
+        loadLocal.setOnClickListener(v -> {
+            if (!downloadedPresets.isEmpty())
+                loadDownloadedPreset(downloadedPresets.get(downloadedPreset.getSelectedItemPosition()));
+        });
+        libraryButtons.addView(catalog, weighted());
+        libraryButtons.addView(loadLocal, weighted());
+        content.addView(libraryButtons);
+
         title("Stroboscop");
         strobe = check("Activează modularea luminii", false);
         strobeColor = spinner(new String[]{"Alb", "Roșu", "Verde", "Albastru", "Chihlimbar"});
@@ -487,6 +513,12 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_ONLINE_PRESET && resultCode == RESULT_OK && data != null) {
+            String id = data.getStringExtra(PresetCatalogActivity.RESULT_PRESET_ID);
+            PresetStore.LocalPreset preset = PresetStore.find(this, id);
+            if (preset != null) loadDownloadedPreset(preset);
+            return;
+        }
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
         try { getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); }
@@ -502,6 +534,19 @@ public final class MainActivity extends Activity {
             musicUri = uri;
             audioService.setMusic(uri, 0.2f);
             toast("Piesă selectată");
+        }
+    }
+
+    private void loadDownloadedPreset(PresetStore.LocalPreset preset) {
+        try (FileReader reader = new FileReader(preset.vectorFile)) {
+            loadedVector = VectorProgram.parseCsv(reader);
+            useVector = true;
+            musicUri = preset.audioFile == null ? null : Uri.fromFile(preset.audioFile);
+            audioService.setMusic(musicUri, 0.2f);
+            toast("Preset local încărcat: " + preset.name);
+            renderCurrentScreen();
+        } catch (Exception e) {
+            toast("Presetul local nu a putut fi citit: " + e.getMessage());
         }
     }
 

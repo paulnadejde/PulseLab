@@ -11,8 +11,10 @@ Aplicație Android offline cu două motoare care pot funcționa simultan:
 - optimizat inițial pentru Android 14;
 - căști stereo pentru modul binaural.
 
-Aplicația nu cere acces la internet. Selectarea fișierelor se face prin selectorul
-Android, iar aplicația primește acces numai la fișierele alese explicit.
+Generatorul și metronomul funcționează offline. Accesul la internet este folosit
+numai când utilizatorul deschide catalogul AquaRitm și descarcă voluntar un
+preset vectorial sau o piesă audio. Selectarea manuală a fișierelor se face prin
+selectorul Android, iar aplicația primește acces numai la fișierele alese explicit.
 
 ## Funcții implementate în 0.1
 
@@ -40,6 +42,7 @@ Android, iar aplicația primește acces numai la fișierele alese explicit.
 - zgomot alb, roz sau brun cu volum separat;
 - piesă audio aleasă de utilizator și reluată în buclă;
 - sesiune constantă temporizată sau vector CSV;
+- catalog online opțional, cu preseturi și piese salvate local pentru utilizare offline;
 - Start, Pauză/Reluare și Stop, cu oprirea semnalului suprapus;
 - stroboscop sinusoidal alb, roșu, verde, albastru sau chihlimbar;
 - avertisment la activarea stroboscopului;

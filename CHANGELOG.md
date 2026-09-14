@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6
+
+- adaugă un catalog online pentru vectori și piese audio opționale;
+- descarcă și verifică SHA-256 pentru fișierele catalogului;
+- păstrează presetările descărcate local și le permite să fie încărcate offline;
+- limitează descărcările la HTTPS de pe domeniul `aquanano.eu`.
+
 ## 0.1.5
 
 - adaugă purtătoarea `f0` în formatul vectorial cu patru coloane;
