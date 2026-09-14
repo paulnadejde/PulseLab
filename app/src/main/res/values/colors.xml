@@ -5,4 +5,5 @@
     <color name="text">#F2F2F2</color>
     <color name="accent">#45D6C4</color>
     <color name="warning">#FFB74D</color>
+    <color name="icon_background">#09060F</color>
 </resources>

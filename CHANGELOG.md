@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- numele afișat al aplicației devine AquaRitm;
+- adaugă iconul propriu cu cele șapte sfere și puls violet;
+- păstrează identificatorul Android și cheia release pentru actualizări.
+
 ## 0.1.2
 
 - corectează definiția modului monoaural: ambele canale redau exclusiv

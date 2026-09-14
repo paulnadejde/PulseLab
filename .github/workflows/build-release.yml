@@ -43,12 +43,12 @@ jobs:
         shell: bash
         run: |
           VERSION_NAME=$(sed -nE 's/.*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts)
-          APK_PATH="PulseLab-${VERSION_NAME}-release.apk"
+          APK_PATH="AquaRitm-${VERSION_NAME}-release.apk"
           cp app/build/outputs/apk/release/app-release.apk "$APK_PATH"
           echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: PulseLab-signed-release-apk
+          name: AquaRitm-signed-release-apk
           path: ${{ steps.package.outputs.apk_path }}
           if-no-files-found: error
       - name: Publish GitHub Release for tag
@@ -56,4 +56,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           APK_PATH: ${{ steps.package.outputs.apk_path }}
-        run: gh release create "$GITHUB_REF_NAME" "$APK_PATH" --generate-notes --title "PulseLab $GITHUB_REF_NAME"
+        run: gh release create "$GITHUB_REF_NAME" "$APK_PATH" --generate-notes --title "AquaRitm $GITHUB_REF_NAME"

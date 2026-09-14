@@ -82,7 +82,7 @@ public final class AudioEngine {
             .setTransferMode(AudioTrack.MODE_STREAM)
             .setBufferSizeInBytes(bufferBytes)
             .build();
-        audioThread = new Thread(this::renderLoop, "PulseLabAudio");
+        audioThread = new Thread(this::renderLoop, "AquaRitmAudio");
         audioThread.start();
     }
 

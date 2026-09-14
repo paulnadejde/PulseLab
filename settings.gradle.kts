@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PulseLab"
+rootProject.name = "AquaRitm"
 include(":app")

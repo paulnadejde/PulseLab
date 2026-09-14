@@ -1,4 +1,4 @@
-# PulseLab 0.1.0
+# AquaRitm 0.1
 
 Aplicație Android offline cu două motoare care pot funcționa simultan:
 
@@ -63,7 +63,7 @@ ultimului rând este inclusă în durata totală și menține ultima frecvență
 
 ## Construire
 
-Deschide directorul `PulseLab` în Android Studio, lasă sincronizarea Gradle să
+Deschide directorul proiectului în Android Studio, lasă sincronizarea Gradle să
 se încheie, apoi folosește **Build → Build APK(s)**. Alternativ, cu Gradle 8.9
 instalat:
 

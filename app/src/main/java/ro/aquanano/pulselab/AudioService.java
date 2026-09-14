@@ -41,7 +41,7 @@ public final class AudioService extends Service {
         engine = new AudioEngine();
         engine.start();
         NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "PulseLab audio",
+        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "AquaRitm audio",
             NotificationManager.IMPORTANCE_LOW));
         handler.post(completionWatcher);
     }
@@ -55,7 +55,7 @@ public final class AudioService extends Service {
             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification n = new Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("PulseLab")
+            .setContentTitle("AquaRitm")
             .setContentText("Sesiune audio activă")
             .setContentIntent(pi)
             .setOngoing(true)
