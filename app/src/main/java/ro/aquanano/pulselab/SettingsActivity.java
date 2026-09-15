@@ -121,7 +121,7 @@ public final class SettingsActivity extends Activity {
         addSystemButton(page, "ECONOMISIRE BATERIE", Settings.ACTION_BATTERY_SAVER_SETTINGS);
 
         section(page, "Update");
-        updateStatus = text("Versiunea instalată: " + BuildConfig.VERSION_NAME, 14);
+        updateStatus = text("Versiunea instalată: " + installedVersion(), 14);
         updateStatus.setTextColor(Color.rgb(200, 200, 200));
         page.addView(updateStatus);
         updateButton = button("CAUTĂ ACTUALIZĂRI", BLUE);
@@ -217,11 +217,12 @@ public final class SettingsActivity extends Activity {
     private void showUpdateResult(String version, String apk, String hash, long size) {
         updateButton.setEnabled(true);
         updateButton.setText("CAUTĂ ACTUALIZĂRI");
-        if (!VersionLogic.isNewer(version, BuildConfig.VERSION_NAME)) {
-            updateStatus.setText("AquaRitm " + BuildConfig.VERSION_NAME + " este versiunea curentă.");
+        String currentVersion = installedVersion();
+        if (!VersionLogic.isNewer(version, currentVersion)) {
+            updateStatus.setText("AquaRitm " + currentVersion + " este versiunea curentă.");
             new AlertDialog.Builder(this)
                 .setTitle("AquaRitm este actualizat")
-                .setMessage("Versiunea instalată: " + BuildConfig.VERSION_NAME
+                .setMessage("Versiunea instalată: " + currentVersion
                     + "\nVersiunea din catalog: " + version)
                 .setPositiveButton("OK", null)
                 .show();
@@ -232,7 +233,7 @@ public final class SettingsActivity extends Activity {
         updateStatus.setText("Este disponibil AquaRitm " + version + ".");
         new AlertDialog.Builder(this)
             .setTitle("Actualizare disponibilă")
-            .setMessage("Instalat: " + BuildConfig.VERSION_NAME
+            .setMessage("Instalat: " + currentVersion
                 + "\nDisponibil: " + version + sizeText
                 + "\n\nAPK-ul va fi verificat înainte de instalare.")
             .setNegativeButton("MAI TÂRZIU", null)
@@ -393,6 +394,16 @@ public final class SettingsActivity extends Activity {
             .remove(PENDING_DOWNLOAD_HASH)
             .remove(PENDING_DOWNLOAD_VERSION)
             .apply();
+    }
+
+    private String installedVersion() {
+        try {
+            String version = getPackageManager()
+                .getPackageInfo(getPackageName(), 0).versionName;
+            return version == null ? "0.0.0" : version;
+        } catch (Exception unavailable) {
+            return "0.0.0";
+        }
     }
 
     private static String humanSize(long bytes) {
