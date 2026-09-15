@@ -8,14 +8,16 @@ header('X-Content-Type-Options: nosniff');
 const AQUARITM_DOCUMENTATION_BASE_URL =
     'https://aquanano.eu/aquaweb/aquaritm/documentatie';
 
-function aquaritm_document_title(string $path, string $fallback): string
+function aquaritm_document_title(string $path, string $fallback, string $extension): string
 {
-    $preview = file_get_contents($path, false, null, 0, 65536);
-    if (is_string($preview)
-        && preg_match('/^(?:\xEF\xBB\xBF)?\s*#\s+(.+)$/m', $preview, $matches) === 1) {
-        $title = trim($matches[1]);
-        if ($title !== '') {
-            return $title;
+    if (in_array($extension, ['md', 'txt'], true)) {
+        $preview = file_get_contents($path, false, null, 0, 65536);
+        if (is_string($preview)
+            && preg_match('/^(?:\xEF\xBB\xBF)?\s*#\s+(.+)$/m', $preview, $matches) === 1) {
+            $title = trim($matches[1]);
+            if ($title !== '') {
+                return $title;
+            }
         }
     }
 
@@ -61,7 +63,7 @@ function aquaritm_document_catalog(string $directory): array
         }
 
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        if (!in_array($extension, ['md', 'txt'], true)) {
+        if (!in_array($extension, ['md', 'txt', 'pdf'], true)) {
             continue;
         }
 
@@ -80,8 +82,13 @@ function aquaritm_document_catalog(string $directory): array
         $documents[] = [
             'id' => $id,
             'order' => aquaritm_document_order($stem),
-            'title' => aquaritm_document_title($path, $stem),
+            'title' => aquaritm_document_title($path, $stem, $extension),
             'format' => $extension,
+            'mime_type' => match ($extension) {
+                'pdf' => 'application/pdf',
+                'md' => 'text/markdown',
+                default => 'text/plain',
+            },
             'document' => AQUARITM_DOCUMENTATION_BASE_URL
                 . '/' . rawurlencode($filename),
             'filename' => $filename,
