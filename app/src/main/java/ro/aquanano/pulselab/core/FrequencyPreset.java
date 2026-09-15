@@ -79,20 +79,23 @@ public final class FrequencyPreset {
     }
 
     private static double optionalFrequency(String raw, String name, int line) throws Exception {
-        if (raw.trim().isEmpty()) return Double.NaN;
-        return requiredFrequency(raw, name, line);
+        double value = number(raw, name, line);
+        if (value == 0.0) return Double.NaN;
+        if (value < 0.1 || value > 9999.9) {
+            throw new Exception(name + " trebuie să fie 0 sau între 0.1 și 9999.9 Hz");
+        }
+        return value;
     }
 
     private static double componentVolume(String raw, double frequency,
                                           String name, int line) throws Exception {
+        double value = number(raw, name, line);
         if (Double.isNaN(frequency)) {
-            if (!raw.trim().isEmpty() && number(raw, name, line) != 0.0) {
-                throw new Exception(name + " este definit fără frecvență");
+            if (value != 0.0) {
+                throw new Exception(name + " trebuie să fie 0 când frecvența lipsește");
             }
             return 0.0;
         }
-        if (raw.trim().isEmpty()) return 20.0;
-        double value = number(raw, name, line);
         if (value < 0.0 || value > 100.0) {
             throw new Exception(name + " trebuie să fie între 0 și 100%");
         }

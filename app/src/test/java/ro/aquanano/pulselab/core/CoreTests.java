@@ -61,12 +61,21 @@ public final class CoreTests {
 
         String oneComponent =
             "fundamental_hz,frequency_2_hz,volume_2_percent,frequency_3_hz,volume_3_percent\n"
-                + "180.0,360.0,20,,\n";
+                + "180.0,360.0,20,0,0\n";
         FrequencyPreset one = FrequencyPreset.parseCsv(new StringReader(oneComponent));
         assert one.hasSecond();
         assert !one.hasThird();
         assert Math.abs(HarmonicMixer.mix(1.0, true, 1.0, 0.2, false, 0.0, 0.2)
             - 1.0) < 1e-9;
+        boolean blankRejected = false;
+        try {
+            FrequencyPreset.parseCsv(new StringReader(
+                "fundamental_hz,frequency_2_hz,volume_2_percent,frequency_3_hz,volume_3_percent\n"
+                    + "180.0,360.0,20,,\n"));
+        } catch (Exception expected) {
+            blankRejected = true;
+        }
+        assert blankRejected;
 
         for (int i = 0; i < 10_000; i++) {
             double fundamental = Math.sin(i * 0.017);

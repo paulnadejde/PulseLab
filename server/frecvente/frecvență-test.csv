@@ -1,6 +1,6 @@
 # AquaRitm frequency preset
 # name = Frecvență test
-# O frecvență auxiliară goală înseamnă componentă absentă.
+# Frecvența 0 și volumul 0 înseamnă componentă absentă.
 # Volumele sunt procente din amplitudinea fundamentalei.
 fundamental_hz,frequency_2_hz,volume_2_percent,frequency_3_hz,volume_3_percent
 220.0,440.0,20,660.0,20

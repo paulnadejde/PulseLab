@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.13
+
+- face obligatorii toate cele cinci valori numerice din presetul de frecvențe;
+- folosește perechea 0 Hz / 0% pentru a marca o componentă auxiliară absentă;
+- respinge explicit celulele goale și volumele nenule fără frecvență.
+
+
 ## 0.1.12
 
 - adaugă volum independent 0–100% pentru fiecare componentă monoaurală, implicit 20%;
