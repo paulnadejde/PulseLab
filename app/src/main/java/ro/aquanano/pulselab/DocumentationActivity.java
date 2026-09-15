@@ -171,14 +171,13 @@ public final class DocumentationActivity extends Activity {
         button.setText(value);
         button.setTextColor(Color.WHITE);
         button.setTypeface(Typeface.DEFAULT_BOLD);
+        UiStyle.compactButton(button, this);
         button.setBackground(surface(color, dp(10)));
         return button;
     }
 
     private LinearLayout.LayoutParams fullButton() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
-        params.setMargins(0, dp(4), 0, dp(4));
-        return params;
+        return UiStyle.centeredButton(this);
     }
 
     private GradientDrawable surface(int color, int radius) {

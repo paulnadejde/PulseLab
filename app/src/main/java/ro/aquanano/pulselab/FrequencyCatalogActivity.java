@@ -49,10 +49,9 @@ public final class FrequencyCatalogActivity extends Activity {
         scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        Button close = new Button(this);
-        close.setText("ÎNCHIDE");
+        Button close = button("ÎNCHIDE");
         close.setOnClickListener(v -> finish());
-        page.addView(close);
+        page.addView(close, UiStyle.centeredButton(this));
         setContentView(page);
         loadCatalog();
     }
@@ -87,10 +86,9 @@ public final class FrequencyCatalogActivity extends Activity {
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(10), dp(8), dp(10), dp(12));
             card.addView(text(item.optString("name", "Preset"), 18));
-            Button load = new Button(this);
-            load.setText("ÎNCARCĂ");
+            Button load = button("ÎNCARCĂ");
             load.setOnClickListener(v -> download(item, catalogUrl, load));
-            card.addView(load);
+            card.addView(load, UiStyle.centeredButton(this));
             list.addView(card);
         }
     }
@@ -148,6 +146,13 @@ public final class FrequencyCatalogActivity extends Activity {
         view.setGravity(Gravity.CENTER_VERTICAL);
         view.setPadding(dp(5), dp(5), dp(5), dp(5));
         return view;
+    }
+
+    private Button button(String value) {
+        Button button = new Button(this);
+        button.setText(value);
+        UiStyle.compactButton(button, this);
+        return button;
     }
 
     private int dp(int value) {

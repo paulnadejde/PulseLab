@@ -79,8 +79,9 @@ public final class VectorGraphActivity extends Activity {
         Button close = new Button(this);
         close.setText("ÎNCHIDE");
         close.setTextColor(Color.WHITE);
+        UiStyle.compactButton(close, this);
         close.setOnClickListener(v -> finish());
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(dp(130), dp(54));
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(dp(100), dp(40));
         closeParams.gravity = Gravity.TOP | Gravity.END;
         closeParams.setMargins(0, dp(8), dp(8), 0);
         root.addView(close, closeParams);

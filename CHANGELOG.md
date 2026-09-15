@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.17
+
+- reduce fontul tuturor butoanelor la 75% din dimensiunea anterioară;
+- micșorează și uniformizează înălțimea butoanelor în toate ecranele și meniurile;
+- centrează butoanele singulare și păstrează spațieri egale în rândurile cu două sau trei butoane;
+- aplică o spațiere verticală discretă între butoanele așezate unul sub altul.
+
+
 ## 0.1.16
 
 - copiază automat vectorii CSV importați în spațiul persistent al aplicației;

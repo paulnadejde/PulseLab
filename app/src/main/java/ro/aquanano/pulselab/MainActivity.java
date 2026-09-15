@@ -174,12 +174,15 @@ public final class MainActivity extends Activity {
         Button bioStimTab = tabButton("BIOSTIM", currentScreen == SCREEN_BIOSTIM);
         Button mindExtraTab = tabButton("MINDEXTRA", currentScreen == SCREEN_MINDEXTRA);
         Button settingsButton = button("☰");
-        settingsButton.setTextSize(25);
+        settingsButton.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
+        settingsButton.setTextSize(18);
         settingsButton.setContentDescription("Setări AquaRitm");
-        tabs.addView(metroTab, weighted());
-        tabs.addView(bioStimTab, weighted());
-        tabs.addView(mindExtraTab, weighted());
-        tabs.addView(settingsButton, new LinearLayout.LayoutParams(dp(58), dp(54)));
+        tabs.addView(metroTab, weightedButton());
+        tabs.addView(bioStimTab, weightedButton());
+        tabs.addView(mindExtraTab, weightedButton());
+        LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(dp(44), dp(40));
+        menuParams.setMargins(dp(3), dp(3), dp(3), dp(3));
+        tabs.addView(settingsButton, menuParams);
         page.addView(tabs);
         metroTab.setOnClickListener(v -> { currentScreen = SCREEN_METRONOME; renderCurrentScreen(); });
         bioStimTab.setOnClickListener(v -> { currentScreen = SCREEN_BIOSTIM; renderCurrentScreen(); });
@@ -244,9 +247,9 @@ public final class MainActivity extends Activity {
         LinearLayout adjust = horizontal();
         Button minus = button("−");
         Button plus = button("+");
-        adjust.addView(minus, weighted());
+        adjust.addView(minus, weightedButton());
         adjust.addView(adjustmentValue, weighted());
-        adjust.addView(plus, weighted());
+        adjust.addView(plus, weightedButton());
         content.addView(adjust);
         adjustmentMode.setOnItemSelectedListener(new SimpleItemSelected() {
             @Override public void selected(int position) {
@@ -263,8 +266,8 @@ public final class MainActivity extends Activity {
         LinearLayout run = horizontal();
         Button startPause = button(audioService.engine().isMetronomeRunning() ? "PAUZĂ" : "START");
         Button resetValues = button("RESET VALORI");
-        run.addView(startPause, weighted());
-        run.addView(resetValues, weighted());
+        run.addView(startPause, weightedButton());
+        run.addView(resetValues, weightedButton());
         content.addView(run);
         startPause.setOnClickListener(v -> {
             syncMetronomeToEngine();
@@ -312,8 +315,8 @@ public final class MainActivity extends Activity {
         LinearLayout presets = horizontal();
         Button save = button("SALVEAZĂ");
         Button load = button("ÎNCARCĂ");
-        presets.addView(save, weighted());
-        presets.addView(load, weighted());
+        presets.addView(save, weightedButton());
+        presets.addView(load, weightedButton());
         content.addView(presets);
         save.setOnClickListener(v -> saveMetroPreset());
         load.setOnClickListener(v -> loadMetroPreset());
@@ -530,9 +533,9 @@ public final class MainActivity extends Activity {
         pause.setAlpha(thisInstrumentActive ? 1f : 0.4f);
         stop.setEnabled(thisInstrumentActive);
         stop.setAlpha(thisInstrumentActive ? 1f : 0.4f);
-        run.addView(start, weighted());
-        run.addView(pause, weighted());
-        run.addView(stop, weighted());
+        run.addView(start, weightedButton());
+        run.addView(pause, weightedButton());
+        run.addView(stop, weightedButton());
         content.addView(run);
         start.setOnClickListener(v -> {
             if (startGenerator(bioStim)) {
@@ -1114,6 +1117,8 @@ public final class MainActivity extends Activity {
         b.setText(value);
         b.setTextColor(Color.WHITE);
         b.setTypeface(Typeface.DEFAULT_BOLD);
+        UiStyle.compactButton(b, this);
+        b.setLayoutParams(UiStyle.centeredButton(this));
         int color;
         String upper = value.toUpperCase(Locale.ROOT);
         if (upper.contains("START") || upper.contains("REIA")) color = Color.rgb(28, 135, 82);
@@ -1129,9 +1134,6 @@ public final class MainActivity extends Activity {
 
     private Button tabButton(String value, boolean active) {
         Button b = button(value);
-        b.setTextSize(11);
-        b.setSingleLine(true);
-        b.setMinWidth(0);
         b.setPadding(dp(2), 0, dp(2), 0);
         applyButtonSurface(b, active ? ACCENT : Color.rgb(52, 57, 61));
         b.setTextColor(active ? Color.BLACK : Color.WHITE);
@@ -1207,6 +1209,7 @@ public final class MainActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0, dp(52), 1); }
+    private LinearLayout.LayoutParams weightedButton() { return UiStyle.weightedButton(this); }
     private FrameLayout.LayoutParams match() { return new FrameLayout.LayoutParams(-1, -1); }
     private LinearLayout.LayoutParams matchWidth() { return new LinearLayout.LayoutParams(-1, -2); }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }

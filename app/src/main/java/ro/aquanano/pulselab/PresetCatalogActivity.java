@@ -41,10 +41,9 @@ public final class PresetCatalogActivity extends Activity {
         list.addView(text("Încarc lista…", 17));
         scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        Button close = new Button(this);
-        close.setText("ÎNCHIDE");
+        Button close = button("ÎNCHIDE");
         close.setOnClickListener(v -> finish());
-        page.addView(close);
+        page.addView(close, UiStyle.centeredButton(this));
         setContentView(page);
         loadCatalog();
     }
@@ -90,13 +89,12 @@ public final class PresetCatalogActivity extends Activity {
             card.addView(text(item.optString("name", "Fișier"), 18));
             String description = item.optString("description", "");
             if (!description.isEmpty()) card.addView(text(description, 14));
-            Button download = new Button(this);
             boolean installed = TYPE_VECTOR.equals(type)
                 ? PresetStore.find(this, item.optString("id")) != null
                 : PresetStore.findAudio(this, item.optString("id")) != null;
-            download.setText(installed ? "ACTUALIZEAZĂ" : "DESCARCĂ");
+            Button download = button(installed ? "ACTUALIZEAZĂ" : "DESCARCĂ");
             download.setOnClickListener(v -> download(item, type, catalogUrl, download));
-            card.addView(download);
+            card.addView(download, UiStyle.centeredButton(this));
             list.addView(card);
         }
     }
@@ -144,6 +142,13 @@ public final class PresetCatalogActivity extends Activity {
         view.setGravity(Gravity.CENTER_VERTICAL);
         view.setPadding(dp(5), dp(5), dp(5), dp(5));
         return view;
+    }
+
+    private Button button(String value) {
+        Button button = new Button(this);
+        button.setText(value);
+        UiStyle.compactButton(button, this);
+        return button;
     }
 
     private int dp(int value) {

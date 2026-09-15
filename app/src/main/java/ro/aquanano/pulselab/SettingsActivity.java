@@ -86,7 +86,9 @@ public final class SettingsActivity extends Activity {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         header.addView(title, new LinearLayout.LayoutParams(0, dp(56), 1));
         Button back = button("ÎNAPOI", BLUE);
-        header.addView(back, new LinearLayout.LayoutParams(dp(110), dp(52)));
+        LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(dp(88), dp(40));
+        backParams.setMargins(dp(4), dp(4), dp(4), dp(4));
+        header.addView(back, backParams);
         page.addView(header);
         back.setOnClickListener(v -> finish());
 
@@ -456,8 +458,8 @@ public final class SettingsActivity extends Activity {
         Button button = new Button(this);
         button.setText(value);
         button.setTextColor(Color.WHITE);
-        button.setTextSize(14);
         button.setTypeface(Typeface.DEFAULT_BOLD);
+        UiStyle.compactButton(button, this);
         button.setBackground(surface(color, dp(10)));
         button.setPadding(dp(8), dp(4), dp(8), dp(4));
         return button;
@@ -481,9 +483,7 @@ public final class SettingsActivity extends Activity {
     }
 
     private LinearLayout.LayoutParams fullButton() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(54));
-        params.setMargins(0, dp(4), 0, dp(4));
-        return params;
+        return UiStyle.centeredButton(this);
     }
 
     private GradientDrawable surface(int color, int radius) {
