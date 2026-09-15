@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.11
+
+- conectează secțiunea Update la catalogul din directorul „aplicatie”;
+- compară versiunea instalată cu versiunea marcată automat drept „latest”;
+- descarcă actualizarea prin managerul Android și păstrează progresul între deschideri;
+- verifică SHA-256 înainte de a permite instalarea;
+- deschide instalatorul Android și gestionează permisiunea pentru surse externe.
+
+
 ## 0.1.10
 
 - adaugă pagina centrală „Setări AquaRitm”, accesibilă prin meniul ☰;

@@ -38,6 +38,15 @@ public final class CoreTests {
         assert Math.abs(HarmonicMixer.mix(1.0, false, 0.7, false, -0.2) - 1.0) < 1e-9;
         assert Math.abs(HarmonicMixer.mix(1.0, true, 0.0, false, -0.2) - 0.5) < 1e-9;
         assert Math.abs(HarmonicMixer.mix(1.0, true, 0.0, true, -1.0)) < 1e-9;
+
+        assert VersionLogic.isValid("0.1.10");
+        assert !VersionLogic.isValid("release");
+        assert VersionLogic.compare("0.1.10", "0.1.9") > 0;
+        assert VersionLogic.compare("1.0.0", "0.99.999") > 0;
+        assert VersionLogic.compare("0.1.10", "0.1.10") == 0;
+        assert VersionLogic.isNewer("0.1.11", "0.1.10");
+        assert !VersionLogic.isNewer("0.1.9", "0.1.10");
+
         for (int i = 0; i < 10_000; i++) {
             double fundamental = Math.sin(i * 0.017);
             double second = Math.sin(i * 0.031);
