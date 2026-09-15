@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.8
+
+- adaugă opțional armonica a doua și armonica a treia în modul monoaural;
+- normalizează suma componentelor pentru a păstra semnalul în domeniul PCM;
+- păstrează semnalul rezultat identic pe canalele stâng și drept, fără folosirea lui `fm`;
+- ignoră armonicile care ar depăși frecvența Nyquist la 48 kHz.
+
+
 ## 0.1.7
 
 - folosește `catalog_aquaritm.php`, generat automat din directoarele Web Disk;

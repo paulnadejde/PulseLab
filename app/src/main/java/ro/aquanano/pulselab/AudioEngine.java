@@ -10,6 +10,7 @@ import android.os.SystemClock;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import ro.aquanano.pulselab.core.HarmonicMixer;
 import ro.aquanano.pulselab.core.MetronomeLogic;
 import ro.aquanano.pulselab.core.VectorProgram;
 
@@ -36,6 +37,8 @@ public final class AudioEngine {
     private volatile boolean generatorActive;
     private volatile boolean generatorPaused;
     private volatile boolean binaural = true;
+    private volatile boolean monoSecondHarmonic;
+    private volatile boolean monoThirdHarmonic;
     private volatile double carrierHz = 220.0;
     private volatile double beatHz = 10.0;
     private volatile float generatorVolume = 0.25f;
@@ -59,6 +62,12 @@ public final class AudioEngine {
     public boolean isGeneratorPaused() { return generatorPaused; }
     public boolean isBinaural() { return binaural; }
     public void setBinauralMode(boolean enabled) { binaural = enabled; }
+    public boolean usesSecondHarmonic() { return monoSecondHarmonic; }
+    public boolean usesThirdHarmonic() { return monoThirdHarmonic; }
+    public void setMonoHarmonics(boolean second, boolean third) {
+        monoSecondHarmonic = second;
+        monoThirdHarmonic = third;
+    }
     public double carrierHz() { return carrierHz; }
     public float generatorVolume() { return generatorVolume; }
     public Noise noise() { return noise; }
@@ -169,8 +178,10 @@ public final class AudioEngine {
     }
 
     public void configureGenerator(boolean binauralMode, double carrier, double beat,
+                                   boolean secondHarmonic, boolean thirdHarmonic,
                                    float volume, Noise noiseType, float noiseLevel) {
         binaural = binauralMode;
+        setMonoHarmonics(secondHarmonic, thirdHarmonic);
         carrierHz = Math.max(0.1, Math.min(9999.9, carrier));
         beatHz = Math.max(0, Math.min(999.99, Math.min(beat, carrierHz / 2.0)));
         generatorVolume = clamp01(volume);
@@ -227,7 +238,9 @@ public final class AudioEngine {
                     right += Math.sin(phaseRight) * generatorVolume;
                 } else {
                     monoPhase = wrap(monoPhase + twoPi(bufferCarrier));
-                    double sample = Math.sin(monoPhase) * generatorVolume;
+                    boolean second = monoSecondHarmonic && bufferCarrier * 2.0 < SAMPLE_RATE / 2.0;
+                    boolean third = monoThirdHarmonic && bufferCarrier * 3.0 < SAMPLE_RATE / 2.0;
+                    double sample = HarmonicMixer.sample(monoPhase, second, third) * generatorVolume;
                     left += sample;
                     right += sample;
                 }

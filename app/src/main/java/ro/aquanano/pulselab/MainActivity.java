@@ -78,6 +78,8 @@ public final class MainActivity extends Activity {
     private DigitDialView carrierDial;
     private DigitDialView beatDial;
     private RadioGroup audioMode;
+    private CheckBox secondHarmonic;
+    private CheckBox thirdHarmonic;
     private SeekBar generatorVolume;
     private SeekBar overlayVolume;
     private Spinner noiseType;
@@ -288,9 +290,26 @@ public final class MainActivity extends Activity {
         RadioButton mono = radio("Monoaural", !audioService.engine().isBinaural());
         audioMode.addView(binaural, weighted());
         audioMode.addView(mono, weighted());
-        audioMode.setOnCheckedChangeListener((group, checkedId) ->
-            audioService.engine().setBinauralMode(checkedId == binaural.getId()));
         content.addView(audioMode);
+
+        title("Armonici monoaurale");
+        secondHarmonic = check("Adaugă armonica a doua (2 × f0)",
+            audioService.engine().usesSecondHarmonic());
+        thirdHarmonic = check("Adaugă armonica a treia (3 × f0)",
+            audioService.engine().usesThirdHarmonic());
+        content.addView(secondHarmonic);
+        content.addView(thirdHarmonic);
+        boolean monoSelected = !audioService.engine().isBinaural();
+        setHarmonicControlsEnabled(monoSelected);
+        secondHarmonic.setOnCheckedChangeListener((button, checked) ->
+            audioService.engine().setMonoHarmonics(checked, thirdHarmonic.isChecked()));
+        thirdHarmonic.setOnCheckedChangeListener((button, checked) ->
+            audioService.engine().setMonoHarmonics(secondHarmonic.isChecked(), checked));
+        audioMode.setOnCheckedChangeListener((group, checkedId) -> {
+            boolean isBinaural = checkedId == binaural.getId();
+            audioService.engine().setBinauralMode(isBinaural);
+            setHarmonicControlsEnabled(!isBinaural);
+        });
 
         title("Purtătoare (Hz)");
         carrierDial = new DigitDialView(this, 1);
@@ -414,6 +433,13 @@ public final class MainActivity extends Activity {
         content.addView(keep);
     }
 
+    private void setHarmonicControlsEnabled(boolean enabled) {
+        secondHarmonic.setEnabled(enabled);
+        secondHarmonic.setAlpha(enabled ? 1f : 0.4f);
+        thirdHarmonic.setEnabled(enabled);
+        thirdHarmonic.setAlpha(enabled ? 1f : 0.4f);
+    }
+
     private void adjustMetronome(int sign) {
         syncMetronomeToEngine();
         double amount = parseDouble(adjustmentValue, adjustmentMode.getSelectedItemPosition() == 0 ? 1 : 0.1);
@@ -498,7 +524,8 @@ public final class MainActivity extends Activity {
         int overlay = noiseType.getSelectedItemPosition();
         AudioEngine.Noise n = overlay >= 1 && overlay <= 3 ? AudioEngine.Noise.values()[overlay] : AudioEngine.Noise.NONE;
         audioService.engine().configureGenerator(audioMode.getCheckedRadioButtonId() == audioMode.getChildAt(0).getId(),
-            carrier, beat, generatorVolume.getProgress() / 100f, n, overlayVolume.getProgress() / 100f);
+            carrier, beat, secondHarmonic.isChecked(), thirdHarmonic.isChecked(),
+            generatorVolume.getProgress() / 100f, n, overlayVolume.getProgress() / 100f);
         useVector = vectorMode.isChecked();
         VectorProgram p = useVector ? loadedVector : null;
         if (useVector && p == null) { toast("Încarcă mai întâi un vector CSV"); return; }
