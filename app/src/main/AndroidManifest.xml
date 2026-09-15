@@ -27,6 +27,9 @@
         <activity
             android:name=".PresetCatalogActivity"
             android:exported="false" />
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false" />
 
         <service
             android:name=".AudioService"

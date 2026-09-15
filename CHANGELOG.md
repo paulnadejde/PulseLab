@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.10
+
+- adaugă pagina centrală „Setări AquaRitm”, accesibilă prin meniul ☰;
+- oferă economii selective: stingerea ecranului, actualizare UI mai rară și dezactivarea stroboscopului;
+- adaugă scurtături către setările Android pentru rețele, mod avion, Bluetooth, locație, ecran și baterie;
+- pregătește secțiunile Update și Help și adaugă închiderea confirmată a aplicației și a serviciului audio.
+
+
 ## 0.1.9
 
 - permite înlocuirea independentă a componentelor `2 × f0` și `3 × f0` cu frecvențe proprii;

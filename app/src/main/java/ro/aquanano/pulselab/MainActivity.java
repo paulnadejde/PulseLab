@@ -127,6 +127,16 @@ public final class MainActivity extends Activity {
         handler.post(uiTicker);
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        if (prefs().getBoolean("energy_disable_strobe", false) && strobe != null) {
+            strobe.setChecked(false);
+            root.setBackgroundColor(Color.BLACK);
+        }
+        if (bound) renderCurrentScreen();
+        else applyKeepScreenOn();
+    }
+
     @Override protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         if (bound) unbindService(connection);
@@ -144,11 +154,17 @@ public final class MainActivity extends Activity {
         LinearLayout tabs = horizontal();
         Button metroTab = tabButton("METRONOM", !showGenerator);
         Button genTab = tabButton("GENERATOR", showGenerator);
+        Button settingsButton = button("☰");
+        settingsButton.setTextSize(25);
+        settingsButton.setContentDescription("Setări AquaRitm");
         tabs.addView(metroTab, weighted());
         tabs.addView(genTab, weighted());
+        tabs.addView(settingsButton, new LinearLayout.LayoutParams(dp(58), dp(54)));
         page.addView(tabs);
         metroTab.setOnClickListener(v -> { showGenerator = false; renderCurrentScreen(); });
         genTab.setOnClickListener(v -> { showGenerator = true; renderCurrentScreen(); });
+        settingsButton.setOnClickListener(v ->
+            startActivity(new Intent(this, SettingsActivity.class)));
 
         status = text("Motoare oprite", 13);
         status.setTextColor(ACCENT);
@@ -279,7 +295,10 @@ public final class MainActivity extends Activity {
         save.setOnClickListener(v -> saveMetroPreset());
         load.setOnClickListener(v -> loadMetroPreset());
 
-        CheckBox keep = check("Menține ecranul aprins", keepMetro);
+        boolean forceScreenOff = prefs().getBoolean("energy_screen_off", false);
+        CheckBox keep = check("Menține ecranul aprins", keepMetro && !forceScreenOff);
+        keep.setEnabled(!forceScreenOff);
+        keep.setAlpha(forceScreenOff ? 0.55f : 1f);
         keep.setOnCheckedChangeListener((b, checked) -> { keepMetro = checked; applyKeepScreenOn(); });
         content.addView(keep);
     }
@@ -420,8 +439,15 @@ public final class MainActivity extends Activity {
         content.addView(libraryButtons);
 
         title("Stroboscop");
-        strobe = check("Activează modularea luminii", false);
+        boolean strobeDisabled = prefs().getBoolean("energy_disable_strobe", false);
+        strobe = check(strobeDisabled
+            ? "Modularea luminii este dezactivată din Setări"
+            : "Activează modularea luminii", false);
+        strobe.setEnabled(!strobeDisabled);
+        strobe.setAlpha(strobeDisabled ? 0.55f : 1f);
         strobeColor = spinner(new String[]{"Alb", "Roșu", "Verde", "Albastru", "Chihlimbar"});
+        strobeColor.setEnabled(!strobeDisabled);
+        strobeColor.setAlpha(strobeDisabled ? 0.55f : 1f);
         content.addView(strobe);
         content.addView(strobeColor);
         strobe.setOnCheckedChangeListener((b, checked) -> {
@@ -455,7 +481,10 @@ public final class MainActivity extends Activity {
         generatorTimer.setGravity(Gravity.CENTER);
         content.addView(generatorTimer);
 
-        CheckBox keep = check("Menține ecranul aprins", keepGenerator);
+        boolean forceScreenOff = prefs().getBoolean("energy_screen_off", false);
+        CheckBox keep = check("Menține ecranul aprins", keepGenerator && !forceScreenOff);
+        keep.setEnabled(!forceScreenOff);
+        keep.setAlpha(forceScreenOff ? 0.55f : 1f);
         keep.setOnCheckedChangeListener((b, checked) -> { keepGenerator = checked; applyKeepScreenOn(); });
         content.addView(keep);
     }
@@ -739,7 +768,10 @@ public final class MainActivity extends Activity {
                 }
                 updateStrobe();
             }
-            handler.postDelayed(this, 50);
+            boolean strobeNeedsFastRefresh = strobe != null && strobe.isChecked();
+            long delay = !strobeNeedsFastRefresh && prefs().getBoolean("energy_slow_ui", false)
+                ? 1000L : 50L;
+            handler.postDelayed(this, delay);
         }
     };
 
@@ -832,8 +864,13 @@ public final class MainActivity extends Activity {
     }
 
     private void applyKeepScreenOn() {
-        if (keepMetro || keepGenerator) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        boolean forceScreenOff = prefs().getBoolean("energy_screen_off", false);
+        boolean keepCurrentScreenOn = showGenerator ? keepGenerator : keepMetro;
+        if (!forceScreenOff && keepCurrentScreenOn) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 
     private SeekBar volumeRow(String label, int initial) {
