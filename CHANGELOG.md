@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.22
+
+- fixează ovalul indigo al ideogramelor SolaRitm în orientare verticală, inclusiv în notificarea agentului;
+- adaugă documentația pentru utilizarea filei SolaRitm și a agentului din bara de notificări.
+
+
 ## 0.1.21
 
 - redesenează pictograma MindExtra ca profil uman cu creier auriu și halo discret;

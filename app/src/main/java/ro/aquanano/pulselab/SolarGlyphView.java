@@ -59,8 +59,8 @@ final class SolarGlyphView extends View {
         switch (value) {
             case 5:
                 paint.setColor(monochrome ? Color.WHITE : Color.rgb(75, 34, 143));
-                canvas.drawOval(new RectF(cx - size * .50f, cy - size * .34f,
-                    cx + size * .50f, cy + size * .34f), paint);
+                canvas.drawOval(new RectF(cx - size * .27f, cy - size * .58f,
+                    cx + size * .27f, cy + size * .58f), paint);
                 break;
             case 4:
                 paint.setColor(monochrome ? Color.WHITE : Color.rgb(49, 184, 91));
