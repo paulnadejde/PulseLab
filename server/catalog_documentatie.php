@@ -84,11 +84,9 @@ function aquaritm_document_catalog(string $directory): array
             'order' => aquaritm_document_order($stem),
             'title' => aquaritm_document_title($path, $stem, $extension),
             'format' => $extension,
-            'mime_type' => match ($extension) {
-                'pdf' => 'application/pdf',
-                'md' => 'text/markdown',
-                default => 'text/plain',
-            },
+            'mime_type' => $extension === 'pdf'
+                ? 'application/pdf'
+                : ($extension === 'md' ? 'text/markdown' : 'text/plain'),
             'document' => AQUARITM_DOCUMENTATION_BASE_URL
                 . '/' . rawurlencode($filename),
             'filename' => $filename,
