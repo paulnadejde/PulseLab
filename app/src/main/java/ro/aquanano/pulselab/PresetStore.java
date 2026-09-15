@@ -13,6 +13,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -79,6 +80,32 @@ public final class PresetStore {
         if (id == null) return null;
         for (LocalPreset preset : list(context)) if (id.equals(preset.id)) return preset;
         return null;
+    }
+
+    public static LocalPreset importVector(Context context, String sourceName,
+                                           String csv) throws Exception {
+        byte[] bytes = csv.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > MAX_VECTOR_BYTES) throw new Exception("Fișier prea mare");
+
+        String filename = sourceName == null ? "vector.csv" : new File(sourceName).getName();
+        String name = filename.replaceFirst("(?i)\\.csv$", "").trim();
+        if (name.isEmpty()) name = "Vector local";
+        String id = localVectorId(name);
+        String description = "Importat din memoria telefonului";
+
+        File directory = new File(root(context), id);
+        if (!directory.exists() && !directory.mkdirs())
+            throw new Exception("Nu pot crea directorul local");
+        File vector = new File(directory, "vector.csv");
+        writeText(vector, csv);
+
+        JSONObject metadata = new JSONObject();
+        metadata.put("id", id);
+        metadata.put("name", name);
+        metadata.put("description", description);
+        metadata.put("audio_file", "");
+        writeText(new File(directory, "metadata.json"), metadata.toString(2));
+        return new LocalPreset(id, name, description, vector, null);
     }
 
 
@@ -239,6 +266,17 @@ public final class PresetStore {
         File root = external != null ? external : new File(context.getFilesDir(), "presets");
         if (!root.exists()) root.mkdirs();
         return root;
+    }
+
+    private static String localVectorId(String name) {
+        String ascii = Normalizer.normalize(name, Normalizer.Form.NFD)
+            .replaceAll("\\p{M}+", "");
+        String safe = ascii.toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9._-]+", "-")
+            .replaceAll("^-+|-+$", "");
+        if (safe.isEmpty()) safe = "vector";
+        if (safe.length() > 60) safe = safe.substring(0, 60);
+        return "local-" + safe;
     }
 
     private static String readText(File file, long maximum) throws Exception {

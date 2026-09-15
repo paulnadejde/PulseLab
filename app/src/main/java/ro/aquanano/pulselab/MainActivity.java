@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -40,8 +41,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.FileReader;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 
@@ -99,6 +102,7 @@ public final class MainActivity extends Activity {
     private TextView vectorStage;
     private Spinner downloadedPreset;
     private List<PresetStore.LocalPreset> downloadedPresets;
+    private String selectedLocalPresetId;
     private Spinner downloadedAudio;
     private List<PresetStore.LocalAudio> downloadedAudioFiles;
     private VectorProgram loadedVector;
@@ -481,6 +485,14 @@ public final class MainActivity extends Activity {
             downloadedPresets.stream().map(p -> p.name).toArray(String[]::new);
         downloadedPreset = spinner(localLabels);
         content.addView(downloadedPreset);
+        if (selectedLocalPresetId != null) {
+            for (int i = 0; i < downloadedPresets.size(); i++) {
+                if (selectedLocalPresetId.equals(downloadedPresets.get(i).id)) {
+                    downloadedPreset.setSelection(i);
+                    break;
+                }
+            }
+        }
         Button loadLocal = button("ÎNCARCĂ LOCAL");
         loadLocal.setEnabled(!downloadedPresets.isEmpty());
         loadLocal.setAlpha(downloadedPresets.isEmpty() ? 0.4f : 1f);
@@ -883,12 +895,16 @@ public final class MainActivity extends Activity {
         try { getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); }
         catch (Exception ignored) { }
         if (requestCode == PICK_VECTOR) {
-            try (InputStreamReader reader = new InputStreamReader(getContentResolver().openInputStream(uri))) {
-                loadedVector = VectorProgram.parseCsv(reader);
+            try {
+                String csv = readUriText(uri);
+                loadedVector = VectorProgram.parseCsv(new StringReader(csv));
+                PresetStore.LocalPreset saved = PresetStore.importVector(
+                    this, displayName(uri), csv);
+                selectedLocalPresetId = saved.id;
                 useVector = true;
-                toast("Vector încărcat: " + loadedVector.steps().size() + " pași");
+                toast("Vector salvat local: " + saved.name);
                 renderCurrentScreen();
-            } catch (Exception e) { toast("CSV invalid: " + e.getMessage()); }
+            } catch (Exception e) { toast("Import CSV eșuat: " + e.getMessage()); }
         } else if (requestCode == PICK_MUSIC) {
             musicUri = uri;
             audioService.setMusic(uri, 0.2f);
@@ -906,6 +922,7 @@ public final class MainActivity extends Activity {
     private void loadDownloadedPreset(PresetStore.LocalPreset preset) {
         try (FileReader reader = new FileReader(preset.vectorFile)) {
             loadedVector = VectorProgram.parseCsv(reader);
+            selectedLocalPresetId = preset.id;
             useVector = true;
             musicUri = preset.audioFile == null ? null : Uri.fromFile(preset.audioFile);
             audioService.setMusic(musicUri, 0.2f);
@@ -1112,6 +1129,10 @@ public final class MainActivity extends Activity {
 
     private Button tabButton(String value, boolean active) {
         Button b = button(value);
+        b.setTextSize(11);
+        b.setSingleLine(true);
+        b.setMinWidth(0);
+        b.setPadding(dp(2), 0, dp(2), 0);
         applyButtonSurface(b, active ? ACCENT : Color.rgb(52, 57, 61));
         b.setTextColor(active ? Color.BLACK : Color.WHITE);
         return b;
@@ -1192,6 +1213,31 @@ public final class MainActivity extends Activity {
     private double parseDouble(EditText e, double fallback) {
         try { return Double.parseDouble(e.getText().toString().replace(',', '.')); }
         catch (Exception ignored) { return fallback; }
+    }
+    private String readUriText(Uri uri) throws Exception {
+        InputStream input = getContentResolver().openInputStream(uri);
+        if (input == null) throw new Exception("Fișierul nu poate fi citit");
+        try (InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
+            StringBuilder result = new StringBuilder();
+            char[] buffer = new char[4096];
+            int read;
+            while ((read = reader.read(buffer)) >= 0) {
+                result.append(buffer, 0, read);
+                if (result.length() > 1_000_000) throw new Exception("Fișier prea mare");
+            }
+            return result.toString();
+        }
+    }
+    private String displayName(Uri uri) {
+        try (Cursor cursor = getContentResolver().query(uri,
+            new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                String value = cursor.getString(0);
+                if (value != null && !value.trim().isEmpty()) return value;
+            }
+        } catch (Exception ignored) { }
+        String fallback = uri.getLastPathSegment();
+        return fallback == null || fallback.trim().isEmpty() ? "vector.csv" : fallback;
     }
     private SharedPreferences prefs() { return getSharedPreferences("presets", MODE_PRIVATE); }
     private void toast(String value) { Toast.makeText(this, value, Toast.LENGTH_LONG).show(); }

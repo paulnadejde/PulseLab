@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.16
+
+- copiază automat vectorii CSV importați în spațiul persistent al aplicației;
+- folosește numele fișierului drept nume al presetului local și îl selectează imediat;
+- actualizează presetul existent când este reimportat un fișier cu aceeași denumire;
+- păstrează vectorii importați disponibili după repornirea aplicației;
+- micșorează fontul taburilor principale și păstrează etichetele pe un singur rând.
+
+
 ## 0.1.15
 
 - separă generatorul monoaural și generatorul binaural în filele BioStim și MindExtra;
