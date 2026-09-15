@@ -80,6 +80,8 @@ public final class MainActivity extends Activity {
     private RadioGroup audioMode;
     private CheckBox secondHarmonic;
     private CheckBox thirdHarmonic;
+    private Button secondFrequencyButton;
+    private Button thirdFrequencyButton;
     private SeekBar generatorVolume;
     private SeekBar overlayVolume;
     private Spinner noiseType;
@@ -292,19 +294,44 @@ public final class MainActivity extends Activity {
         audioMode.addView(mono, weighted());
         content.addView(audioMode);
 
-        title("Armonici monoaurale");
-        secondHarmonic = check("Adaugă armonica a doua (2 × f0)",
+        title("Componente suplimentare monoaurale");
+        boolean secondEnabled = prefs().getBoolean("mono_h2_enabled",
             audioService.engine().usesSecondHarmonic());
-        thirdHarmonic = check("Adaugă armonica a treia (3 × f0)",
+        boolean thirdEnabled = prefs().getBoolean("mono_h3_enabled",
             audioService.engine().usesThirdHarmonic());
+        boolean customSecond = prefs().getBoolean("mono_h2_custom",
+            audioService.engine().usesCustomSecondFrequency());
+        boolean customThird = prefs().getBoolean("mono_h3_custom",
+            audioService.engine().usesCustomThirdFrequency());
+        double secondHz = preferenceDouble("mono_h2_hz",
+            audioService.engine().customSecondFrequencyHz());
+        double thirdHz = preferenceDouble("mono_h3_hz",
+            audioService.engine().customThirdFrequencyHz());
+        audioService.engine().setMonoHarmonics(secondEnabled, thirdEnabled);
+        audioService.engine().setMonoFrequencyOverrides(
+            customSecond, secondHz, customThird, thirdHz);
+
+        secondHarmonic = check("Adaugă componenta a doua", secondEnabled);
+        secondFrequencyButton = button(harmonicFrequencyButtonText(2));
+        thirdHarmonic = check("Adaugă componenta a treia", thirdEnabled);
+        thirdFrequencyButton = button(harmonicFrequencyButtonText(3));
         content.addView(secondHarmonic);
+        content.addView(secondFrequencyButton);
         content.addView(thirdHarmonic);
+        content.addView(thirdFrequencyButton);
+
         boolean monoSelected = !audioService.engine().isBinaural();
         setHarmonicControlsEnabled(monoSelected);
-        secondHarmonic.setOnCheckedChangeListener((button, checked) ->
-            audioService.engine().setMonoHarmonics(checked, thirdHarmonic.isChecked()));
-        thirdHarmonic.setOnCheckedChangeListener((button, checked) ->
-            audioService.engine().setMonoHarmonics(secondHarmonic.isChecked(), checked));
+        secondHarmonic.setOnCheckedChangeListener((button, checked) -> {
+            audioService.engine().setMonoHarmonics(checked, thirdHarmonic.isChecked());
+            prefs().edit().putBoolean("mono_h2_enabled", checked).apply();
+        });
+        thirdHarmonic.setOnCheckedChangeListener((button, checked) -> {
+            audioService.engine().setMonoHarmonics(secondHarmonic.isChecked(), checked);
+            prefs().edit().putBoolean("mono_h3_enabled", checked).apply();
+        });
+        secondFrequencyButton.setOnClickListener(v -> showHarmonicFrequencyDialog(2));
+        thirdFrequencyButton.setOnClickListener(v -> showHarmonicFrequencyDialog(3));
         audioMode.setOnCheckedChangeListener((group, checkedId) -> {
             boolean isBinaural = checkedId == binaural.getId();
             audioService.engine().setBinauralMode(isBinaural);
@@ -436,8 +463,82 @@ public final class MainActivity extends Activity {
     private void setHarmonicControlsEnabled(boolean enabled) {
         secondHarmonic.setEnabled(enabled);
         secondHarmonic.setAlpha(enabled ? 1f : 0.4f);
+        secondFrequencyButton.setEnabled(enabled);
+        secondFrequencyButton.setAlpha(enabled ? 1f : 0.4f);
         thirdHarmonic.setEnabled(enabled);
         thirdHarmonic.setAlpha(enabled ? 1f : 0.4f);
+        thirdFrequencyButton.setEnabled(enabled);
+        thirdFrequencyButton.setAlpha(enabled ? 1f : 0.4f);
+    }
+
+    private String harmonicFrequencyButtonText(int order) {
+        boolean second = order == 2;
+        boolean custom = second
+            ? audioService.engine().usesCustomSecondFrequency()
+            : audioService.engine().usesCustomThirdFrequency();
+        if (!custom) return second
+            ? "ALTĂ FRECVENȚĂ 2: standard 2 × f0"
+            : "ALTĂ FRECVENȚĂ 3: standard 3 × f0";
+        double hz = second
+            ? audioService.engine().customSecondFrequencyHz()
+            : audioService.engine().customThirdFrequencyHz();
+        return String.format(Locale.US, "ALTĂ FRECVENȚĂ %d: %.1f Hz", order, hz);
+    }
+
+    private void showHarmonicFrequencyDialog(int order) {
+        boolean second = order == 2;
+        double currentHz = second
+            ? audioService.engine().customSecondFrequencyHz()
+            : audioService.engine().customThirdFrequencyHz();
+        boolean useCustom = second
+            ? audioService.engine().usesCustomSecondFrequency()
+            : audioService.engine().usesCustomThirdFrequency();
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(18), dp(10), dp(18), dp(4));
+        DigitDialView frequency = new DigitDialView(this, 1);
+        frequency.setValue(currentHz);
+        CheckBox useFrequency = check("Folosește această frecvență", useCustom);
+        panel.addView(frequency);
+        panel.addView(useFrequency);
+
+        new AlertDialog.Builder(this)
+            .setTitle(second ? "Componenta a doua" : "Componenta a treia")
+            .setView(panel)
+            .setNegativeButton("ANULEAZĂ", null)
+            .setPositiveButton("SALVEAZĂ", (dialog, which) -> {
+                double hz = frequency.getValue();
+                boolean selected = useFrequency.isChecked();
+                AudioEngine engine = audioService.engine();
+                if (second) {
+                    engine.setMonoFrequencyOverrides(selected, hz,
+                        engine.usesCustomThirdFrequency(), engine.customThirdFrequencyHz());
+                    prefs().edit()
+                        .putBoolean("mono_h2_custom", selected)
+                        .putString("mono_h2_hz", Double.toString(hz))
+                        .apply();
+                    secondFrequencyButton.setText(harmonicFrequencyButtonText(2));
+                } else {
+                    engine.setMonoFrequencyOverrides(
+                        engine.usesCustomSecondFrequency(), engine.customSecondFrequencyHz(),
+                        selected, hz);
+                    prefs().edit()
+                        .putBoolean("mono_h3_custom", selected)
+                        .putString("mono_h3_hz", Double.toString(hz))
+                        .apply();
+                    thirdFrequencyButton.setText(harmonicFrequencyButtonText(3));
+                }
+            })
+            .show();
+    }
+
+    private double preferenceDouble(String key, double fallback) {
+        try {
+            return Double.parseDouble(prefs().getString(key, Double.toString(fallback)));
+        } catch (Exception ignored) {
+            return fallback;
+        }
     }
 
     private void adjustMetronome(int sign) {

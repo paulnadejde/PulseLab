@@ -4,15 +4,17 @@ package ro.aquanano.pulselab.core;
 public final class HarmonicMixer {
     private HarmonicMixer() { }
 
-    public static double sample(double fundamentalPhase, boolean second, boolean third) {
-        double value = Math.sin(fundamentalPhase);
+    public static double mix(double fundamentalSample,
+                             boolean secondEnabled, double secondSample,
+                             boolean thirdEnabled, double thirdSample) {
+        double value = fundamentalSample;
         int components = 1;
-        if (second) {
-            value += Math.sin(2.0 * fundamentalPhase);
+        if (secondEnabled) {
+            value += secondSample;
             components++;
         }
-        if (third) {
-            value += Math.sin(3.0 * fundamentalPhase);
+        if (thirdEnabled) {
+            value += thirdSample;
             components++;
         }
         return value / components;

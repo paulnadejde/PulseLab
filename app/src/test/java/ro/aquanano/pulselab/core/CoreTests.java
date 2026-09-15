@@ -35,16 +35,21 @@ public final class CoreTests {
         assert Math.abs(v4.at(11).carrierHz - 210) < 1e-9;
         assert Math.abs(v4.at(11).frequencyHz - 8) < 1e-9;
 
-        double phase = Math.PI / 2;
-        assert Math.abs(HarmonicMixer.sample(phase, false, false) - 1.0) < 1e-9;
-        assert Math.abs(HarmonicMixer.sample(phase, true, false) - 0.5) < 1e-9;
-        assert Math.abs(HarmonicMixer.sample(phase, true, true)) < 1e-9;
+        assert Math.abs(HarmonicMixer.mix(1.0, false, 0.7, false, -0.2) - 1.0) < 1e-9;
+        assert Math.abs(HarmonicMixer.mix(1.0, true, 0.0, false, -0.2) - 0.5) < 1e-9;
+        assert Math.abs(HarmonicMixer.mix(1.0, true, 0.0, true, -1.0)) < 1e-9;
         for (int i = 0; i < 10_000; i++) {
-            double p = i * Math.PI * 2 / 10_000.0;
-            assert Math.abs(HarmonicMixer.sample(p, false, false)) <= 1.0;
-            assert Math.abs(HarmonicMixer.sample(p, true, false)) <= 1.0;
-            assert Math.abs(HarmonicMixer.sample(p, false, true)) <= 1.0;
-            assert Math.abs(HarmonicMixer.sample(p, true, true)) <= 1.0;
+            double fundamental = Math.sin(i * 0.017);
+            double second = Math.sin(i * 0.031);
+            double third = Math.sin(i * 0.047);
+            assert Math.abs(HarmonicMixer.mix(
+                fundamental, false, second, false, third)) <= 1.0;
+            assert Math.abs(HarmonicMixer.mix(
+                fundamental, true, second, false, third)) <= 1.0;
+            assert Math.abs(HarmonicMixer.mix(
+                fundamental, false, second, true, third)) <= 1.0;
+            assert Math.abs(HarmonicMixer.mix(
+                fundamental, true, second, true, third)) <= 1.0;
         }
         System.out.println("Core tests passed");
     }

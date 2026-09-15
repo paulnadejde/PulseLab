@@ -39,6 +39,10 @@ public final class AudioEngine {
     private volatile boolean binaural = true;
     private volatile boolean monoSecondHarmonic;
     private volatile boolean monoThirdHarmonic;
+    private volatile boolean useCustomSecondFrequency;
+    private volatile boolean useCustomThirdFrequency;
+    private volatile double customSecondFrequencyHz = 440.0;
+    private volatile double customThirdFrequencyHz = 660.0;
     private volatile double carrierHz = 220.0;
     private volatile double beatHz = 10.0;
     private volatile float generatorVolume = 0.25f;
@@ -52,6 +56,8 @@ public final class AudioEngine {
     private double phaseLeft;
     private double phaseRight;
     private double monoPhase;
+    private double customSecondPhase;
+    private double customThirdPhase;
     private final Random random = new Random();
     private double pink0, pink1, pink2;
     private double brown;
@@ -67,6 +73,17 @@ public final class AudioEngine {
     public void setMonoHarmonics(boolean second, boolean third) {
         monoSecondHarmonic = second;
         monoThirdHarmonic = third;
+    }
+    public boolean usesCustomSecondFrequency() { return useCustomSecondFrequency; }
+    public boolean usesCustomThirdFrequency() { return useCustomThirdFrequency; }
+    public double customSecondFrequencyHz() { return customSecondFrequencyHz; }
+    public double customThirdFrequencyHz() { return customThirdFrequencyHz; }
+    public void setMonoFrequencyOverrides(boolean useSecond, double secondHz,
+                                          boolean useThird, double thirdHz) {
+        useCustomSecondFrequency = useSecond;
+        useCustomThirdFrequency = useThird;
+        customSecondFrequencyHz = clampFrequency(secondHz);
+        customThirdFrequencyHz = clampFrequency(thirdHz);
     }
     public double carrierHz() { return carrierHz; }
     public float generatorVolume() { return generatorVolume; }
@@ -238,9 +255,36 @@ public final class AudioEngine {
                     right += Math.sin(phaseRight) * generatorVolume;
                 } else {
                     monoPhase = wrap(monoPhase + twoPi(bufferCarrier));
-                    boolean second = monoSecondHarmonic && bufferCarrier * 2.0 < SAMPLE_RATE / 2.0;
-                    boolean third = monoThirdHarmonic && bufferCarrier * 3.0 < SAMPLE_RATE / 2.0;
-                    double sample = HarmonicMixer.sample(monoPhase, second, third) * generatorVolume;
+
+                    double secondHz = useCustomSecondFrequency
+                        ? customSecondFrequencyHz : bufferCarrier * 2.0;
+                    boolean second = monoSecondHarmonic && secondHz < SAMPLE_RATE / 2.0;
+                    double secondSample = 0.0;
+                    if (second) {
+                        if (useCustomSecondFrequency) {
+                            customSecondPhase = wrap(customSecondPhase + twoPi(secondHz));
+                            secondSample = Math.sin(customSecondPhase);
+                        } else {
+                            secondSample = Math.sin(2.0 * monoPhase);
+                        }
+                    }
+
+                    double thirdHz = useCustomThirdFrequency
+                        ? customThirdFrequencyHz : bufferCarrier * 3.0;
+                    boolean third = monoThirdHarmonic && thirdHz < SAMPLE_RATE / 2.0;
+                    double thirdSample = 0.0;
+                    if (third) {
+                        if (useCustomThirdFrequency) {
+                            customThirdPhase = wrap(customThirdPhase + twoPi(thirdHz));
+                            thirdSample = Math.sin(customThirdPhase);
+                        } else {
+                            thirdSample = Math.sin(3.0 * monoPhase);
+                        }
+                    }
+
+                    double sample = HarmonicMixer.mix(
+                        Math.sin(monoPhase), second, secondSample, third, thirdSample)
+                        * generatorVolume;
                     left += sample;
                     right += sample;
                 }
@@ -291,6 +335,9 @@ public final class AudioEngine {
     private static double twoPi(double frequency) { return 2 * Math.PI * frequency / SAMPLE_RATE; }
     private static double wrap(double phase) { return phase >= 2 * Math.PI ? phase - 2 * Math.PI : phase; }
     private static float clamp01(float v) { return Math.max(0, Math.min(1, v)); }
+    private static double clampFrequency(double value) {
+        return Math.max(0.1, Math.min(9999.9, value));
+    }
     private static short toPcm(double v) {
         v = Math.tanh(v * 0.92); // gentle safety limiter
         return (short) Math.round(Math.max(-1, Math.min(1, v)) * 32767);

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.9
+
+- permite înlocuirea independentă a componentelor `2 × f0` și `3 × f0` cu frecvențe proprii;
+- adaugă câte un dialog compact cu dial și bifa „Folosește această frecvență”;
+- memorează activarea componentelor, frecvențele proprii și modul lor de utilizare;
+- păstrează normalizarea comună și semnalul identic pe ambele canale monoaurale.
+
+
 ## 0.1.8
 
 - adaugă opțional armonica a doua și armonica a treia în modul monoaural;
