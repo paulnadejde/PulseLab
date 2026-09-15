@@ -30,8 +30,6 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Spinner;
@@ -52,6 +50,9 @@ import ro.aquanano.pulselab.core.MetronomeLogic;
 import ro.aquanano.pulselab.core.VectorProgram;
 
 public final class MainActivity extends Activity {
+    private static final int SCREEN_METRONOME = 0;
+    private static final int SCREEN_BIOSTIM = 1;
+    private static final int SCREEN_MINDEXTRA = 2;
     private static final int PICK_VECTOR = 1001;
     private static final int PICK_MUSIC = 1002;
     private static final int PICK_ONLINE_PRESET = 1003;
@@ -64,7 +65,7 @@ public final class MainActivity extends Activity {
     private LinearLayout content;
     private AudioService audioService;
     private boolean bound;
-    private boolean showGenerator;
+    private int currentScreen = SCREEN_METRONOME;
     private boolean keepMetro;
     private boolean keepGenerator;
     private TextView status;
@@ -80,7 +81,6 @@ public final class MainActivity extends Activity {
     private EditText presetName;
     private DigitDialView carrierDial;
     private DigitDialView beatDial;
-    private RadioGroup audioMode;
     private CheckBox secondHarmonic;
     private CheckBox thirdHarmonic;
     private Button secondFrequencyButton;
@@ -154,23 +154,32 @@ public final class MainActivity extends Activity {
     private void renderCurrentScreen() {
         root.removeAllViews();
         root.setBackgroundColor(Color.BLACK);
+        carrierDial = null;
+        beatDial = null;
+        vectorMode = null;
+        vectorStage = null;
+        strobe = null;
+        generatorTimer = null;
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(12), dp(8), dp(12), dp(18));
         root.addView(page, match());
 
         LinearLayout tabs = horizontal();
-        Button metroTab = tabButton("METRONOM", !showGenerator);
-        Button genTab = tabButton("GENERATOR", showGenerator);
+        Button metroTab = tabButton("METRONOM", currentScreen == SCREEN_METRONOME);
+        Button bioStimTab = tabButton("BIOSTIM", currentScreen == SCREEN_BIOSTIM);
+        Button mindExtraTab = tabButton("MINDEXTRA", currentScreen == SCREEN_MINDEXTRA);
         Button settingsButton = button("☰");
         settingsButton.setTextSize(25);
         settingsButton.setContentDescription("Setări AquaRitm");
         tabs.addView(metroTab, weighted());
-        tabs.addView(genTab, weighted());
+        tabs.addView(bioStimTab, weighted());
+        tabs.addView(mindExtraTab, weighted());
         tabs.addView(settingsButton, new LinearLayout.LayoutParams(dp(58), dp(54)));
         page.addView(tabs);
-        metroTab.setOnClickListener(v -> { showGenerator = false; renderCurrentScreen(); });
-        genTab.setOnClickListener(v -> { showGenerator = true; renderCurrentScreen(); });
+        metroTab.setOnClickListener(v -> { currentScreen = SCREEN_METRONOME; renderCurrentScreen(); });
+        bioStimTab.setOnClickListener(v -> { currentScreen = SCREEN_BIOSTIM; renderCurrentScreen(); });
+        mindExtraTab.setOnClickListener(v -> { currentScreen = SCREEN_MINDEXTRA; renderCurrentScreen(); });
         settingsButton.setOnClickListener(v ->
             startActivity(new Intent(this, SettingsActivity.class)));
 
@@ -185,8 +194,10 @@ public final class MainActivity extends Activity {
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         if (!bound) {
             content.addView(text("Inițializez motorul audio…", 18));
-        } else if (showGenerator) {
-            buildGenerator();
+        } else if (currentScreen == SCREEN_BIOSTIM) {
+            buildGenerator(true);
+        } else if (currentScreen == SCREEN_MINDEXTRA) {
+            buildGenerator(false);
         } else {
             buildMetronome();
         }
@@ -311,17 +322,17 @@ public final class MainActivity extends Activity {
         content.addView(keep);
     }
 
-    private void buildGenerator() {
-        title("Mod generator");
-        audioMode = new RadioGroup(this);
-        audioMode.setOrientation(LinearLayout.HORIZONTAL);
-        RadioButton binaural = radio("Binaural", audioService.engine().isBinaural());
-        RadioButton mono = radio("Monoaural", !audioService.engine().isBinaural());
-        audioMode.addView(binaural, weighted());
-        audioMode.addView(mono, weighted());
-        content.addView(audioMode);
+    private void buildGenerator(boolean bioStim) {
+        title(bioStim ? "BioStim • generator monoaural"
+                      : "MindExtra • generator binaural");
+        TextView modeNote = text(bioStim
+            ? "Semnalul rezultat este identic pe canalele stâng și drept."
+            : "Stânga: f0 − fm/2  •  Dreapta: f0 + fm/2", 14);
+        modeNote.setTextColor(Color.LTGRAY);
+        content.addView(modeNote);
 
-        title("Componente suplimentare monoaurale");
+        if (bioStim) {
+        title("Componente suplimentare");
         boolean secondEnabled = prefs().getBoolean("mono_h2_enabled",
             audioService.engine().usesSecondHarmonic());
         boolean thirdEnabled = prefs().getBoolean("mono_h3_enabled",
@@ -356,6 +367,8 @@ public final class MainActivity extends Activity {
         useFrequencyPreset = check("Folosește presetul de frecvențe",
             loadedFrequencyPreset != null
                 && prefs().getBoolean("frequency_preset_enabled", false));
+        useFrequencyPreset.setEnabled(loadedFrequencyPreset != null);
+        useFrequencyPreset.setAlpha(loadedFrequencyPreset != null ? 1f : 0.4f);
         frequencyPresetLabel = text(loadedFrequencyPresetName, 14);
         frequencyPresetLabel.setTextColor(ACCENT);
         content.addView(secondHarmonic);
@@ -366,8 +379,6 @@ public final class MainActivity extends Activity {
         content.addView(useFrequencyPreset);
         content.addView(frequencyPresetLabel);
 
-        boolean monoSelected = !audioService.engine().isBinaural();
-        setHarmonicControlsEnabled(monoSelected);
         secondHarmonic.setOnCheckedChangeListener((button, checked) -> {
             audioService.engine().setMonoHarmonics(checked, thirdHarmonic.isChecked());
             prefs().edit().putBoolean("mono_h2_enabled", checked).apply();
@@ -388,23 +399,24 @@ public final class MainActivity extends Activity {
                 applyFrequencyPreset(loadedFrequencyPreset);
             }
         });
-        audioMode.setOnCheckedChangeListener((group, checkedId) -> {
-            boolean isBinaural = checkedId == binaural.getId();
-            audioService.engine().setBinauralMode(isBinaural);
-            setHarmonicControlsEnabled(!isBinaural);
-        });
+        }
 
-        title("Purtătoare (Hz)");
+        title(bioStim ? "Frecvență fundamentală f0 (Hz)" : "Purtătoare f0 (Hz)");
         carrierDial = new DigitDialView(this, 1);
-        carrierDial.setValue(audioService.engine().carrierHz());
+        carrierDial.setValue(preferenceDouble(
+            bioStim ? "biostim_carrier_hz" : "mindextra_carrier_hz",
+            audioService.engine().carrierHz()));
         content.addView(carrierDial);
-        if (useFrequencyPreset.isChecked() && loadedFrequencyPreset != null) {
+        if (bioStim && useFrequencyPreset.isChecked() && loadedFrequencyPreset != null) {
             applyFrequencyPreset(loadedFrequencyPreset);
         }
-        title("Diferență / frecvență de bătaie (Hz)");
-        beatDial = new DigitDialView(this, 2);
-        beatDial.setValue(audioService.engine().currentBeatHz());
-        content.addView(beatDial);
+        if (!bioStim) {
+            title("Diferență / frecvență de bătaie fm (Hz)");
+            beatDial = new DigitDialView(this, 2);
+            beatDial.setValue(preferenceDouble(
+                "mindextra_beat_hz", audioService.engine().currentBeatHz()));
+            content.addView(beatDial);
+        }
 
         generatorVolume = volumeRow("Volum generator", Math.round(audioService.engine().generatorVolume() * 100));
         title("Semnal suprapus");
@@ -431,14 +443,20 @@ public final class MainActivity extends Activity {
                 loadDownloadedAudio(downloadedAudioFiles.get(downloadedAudio.getSelectedItemPosition()));
         });
         content.addView(loadAudio);
+        Button onlineCatalog = button("CATALOG ONLINE");
+        onlineCatalog.setOnClickListener(v -> startActivityForResult(
+            new Intent(this, PresetCatalogActivity.class), PICK_ONLINE_PRESET));
+        content.addView(onlineCatalog);
 
         title("Sesiune");
-        sessionMinutes = decimal("20");
+        sessionMinutes = decimal(prefs().getString(
+            bioStim ? "biostim_session_minutes" : "mindextra_session_minutes", "20"));
         LinearLayout duration = horizontal();
         duration.addView(text("Durată constantă", 16), new LinearLayout.LayoutParams(0, dp(52), 2));
         duration.addView(sessionMinutes, weighted());
         duration.addView(text(" minute", 15));
         content.addView(duration);
+        if (!bioStim) {
         vectorMode = check("Folosește vector CSV", useVector);
         vectorMode.setOnCheckedChangeListener((b, checked) -> useVector = checked);
         content.addView(vectorMode);
@@ -463,20 +481,14 @@ public final class MainActivity extends Activity {
             downloadedPresets.stream().map(p -> p.name).toArray(String[]::new);
         downloadedPreset = spinner(localLabels);
         content.addView(downloadedPreset);
-        LinearLayout libraryButtons = horizontal();
-        Button catalog = button("CATALOG ONLINE");
         Button loadLocal = button("ÎNCARCĂ LOCAL");
         loadLocal.setEnabled(!downloadedPresets.isEmpty());
         loadLocal.setAlpha(downloadedPresets.isEmpty() ? 0.4f : 1f);
-        catalog.setOnClickListener(v -> startActivityForResult(
-            new Intent(this, PresetCatalogActivity.class), PICK_ONLINE_PRESET));
         loadLocal.setOnClickListener(v -> {
             if (!downloadedPresets.isEmpty())
                 loadDownloadedPreset(downloadedPresets.get(downloadedPreset.getSelectedItemPosition()));
         });
-        libraryButtons.addView(catalog, weighted());
-        libraryButtons.addView(loadLocal, weighted());
-        content.addView(libraryButtons);
+        content.addView(loadLocal);
 
         title("Stroboscop");
         boolean strobeDisabled = prefs().getBoolean("energy_disable_strobe", false);
@@ -494,19 +506,30 @@ public final class MainActivity extends Activity {
             if (checked) showStrobeWarning();
             else root.setBackgroundColor(Color.BLACK);
         });
+        }
 
         LinearLayout run = horizontal();
         Button start = button("START");
-        Button pause = button(audioService.engine().isGeneratorActive() && audioService.engine().isGeneratorPaused()
+        boolean thisInstrumentActive = generatorMatchesScreen(audioService.engine(), bioStim);
+        Button pause = button(thisInstrumentActive && audioService.engine().isGeneratorPaused()
             ? "REIA" : "PAUZĂ");
         Button stop = button("STOP");
+        pause.setEnabled(thisInstrumentActive);
+        pause.setAlpha(thisInstrumentActive ? 1f : 0.4f);
+        stop.setEnabled(thisInstrumentActive);
+        stop.setAlpha(thisInstrumentActive ? 1f : 0.4f);
         run.addView(start, weighted());
         run.addView(pause, weighted());
         run.addView(stop, weighted());
         content.addView(run);
         start.setOnClickListener(v -> {
-            startGenerator();
-            pause.setText("PAUZĂ");
+            if (startGenerator(bioStim)) {
+                pause.setEnabled(true);
+                pause.setAlpha(1f);
+                pause.setText("PAUZĂ");
+                stop.setEnabled(true);
+                stop.setAlpha(1f);
+            }
         });
         pause.setOnClickListener(v -> {
             audioService.engine().toggleGeneratorPause();
@@ -516,6 +539,10 @@ public final class MainActivity extends Activity {
         stop.setOnClickListener(v -> {
             stopGenerator();
             pause.setText("PAUZĂ");
+            pause.setEnabled(false);
+            pause.setAlpha(0.4f);
+            stop.setEnabled(false);
+            stop.setAlpha(0.4f);
         });
         generatorTimer = text("Sesiune: 00:00 / 00:00", 20);
         generatorTimer.setGravity(Gravity.CENTER);
@@ -527,23 +554,6 @@ public final class MainActivity extends Activity {
         keep.setAlpha(forceScreenOff ? 0.55f : 1f);
         keep.setOnCheckedChangeListener((b, checked) -> { keepGenerator = checked; applyKeepScreenOn(); });
         content.addView(keep);
-    }
-
-    private void setHarmonicControlsEnabled(boolean enabled) {
-        secondHarmonic.setEnabled(enabled);
-        secondHarmonic.setAlpha(enabled ? 1f : 0.4f);
-        secondFrequencyButton.setEnabled(enabled);
-        secondFrequencyButton.setAlpha(enabled ? 1f : 0.4f);
-        thirdHarmonic.setEnabled(enabled);
-        thirdHarmonic.setAlpha(enabled ? 1f : 0.4f);
-        thirdFrequencyButton.setEnabled(enabled);
-        thirdFrequencyButton.setAlpha(enabled ? 1f : 0.4f);
-        frequencyPresetButton.setEnabled(enabled);
-        frequencyPresetButton.setAlpha(enabled ? 1f : 0.4f);
-        boolean presetAvailable = enabled && loadedFrequencyPreset != null;
-        useFrequencyPreset.setEnabled(presetAvailable);
-        useFrequencyPreset.setAlpha(presetAvailable ? 1f : 0.4f);
-        frequencyPresetLabel.setAlpha(enabled ? 1f : 0.4f);
     }
 
     private String harmonicFrequencyButtonText(int order) {
@@ -669,6 +679,7 @@ public final class MainActivity extends Activity {
             (float) (preset.thirdVolumePercent / 100.0));
 
         prefs().edit()
+            .putString("biostim_carrier_hz", Double.toString(preset.fundamentalHz))
             .putBoolean("mono_h2_enabled", preset.hasSecond())
             .putBoolean("mono_h3_enabled", preset.hasThird())
             .putBoolean("mono_h2_custom", preset.hasSecond())
@@ -762,35 +773,58 @@ public final class MainActivity extends Activity {
         } catch (Exception e) { toast("Preset invalid"); }
     }
 
-    private void startGenerator() {
-        if (useFrequencyPreset != null && useFrequencyPreset.isChecked()
+    private boolean startGenerator(boolean bioStim) {
+        if (bioStim && useFrequencyPreset != null && useFrequencyPreset.isChecked()
             && loadedFrequencyPreset != null) {
             applyFrequencyPreset(loadedFrequencyPreset);
         }
         double carrier = carrierDial.getValue();
-        double beat = beatDial.getValue();
-        if (carrier < 0.1) { toast("Purtătoarea trebuie să fie peste 0 Hz"); return; }
-        double maxBeat = Math.min(999.99, carrier / 2.0);
-        if (beat > maxBeat) {
-            beat = maxBeat;
-            beatDial.setValue(beat);
-            toast("Frecvența de bătaie a fost limitată la jumătatea purtătoarei");
+        double beat = bioStim ? 0.0 : beatDial.getValue();
+        if (carrier < 0.1) {
+            toast("Frecvența fundamentală trebuie să fie peste 0 Hz");
+            return false;
+        }
+        if (!bioStim) {
+            double maxBeat = Math.min(999.99, carrier / 2.0);
+            if (beat > maxBeat) {
+                beat = maxBeat;
+                beatDial.setValue(beat);
+                toast("Frecvența de bătaie a fost limitată la jumătatea purtătoarei");
+            }
         }
         int overlay = noiseType.getSelectedItemPosition();
         AudioEngine.Noise n = overlay >= 1 && overlay <= 3 ? AudioEngine.Noise.values()[overlay] : AudioEngine.Noise.NONE;
-        audioService.engine().configureGenerator(audioMode.getCheckedRadioButtonId() == audioMode.getChildAt(0).getId(),
-            carrier, beat, secondHarmonic.isChecked(), thirdHarmonic.isChecked(),
+        boolean vectorRequested = !bioStim && vectorMode != null && vectorMode.isChecked();
+        if (!bioStim) useVector = vectorRequested;
+        VectorProgram p = vectorRequested ? loadedVector : null;
+        if (vectorRequested && p == null) {
+            toast("Încarcă mai întâi un vector CSV");
+            return false;
+        }
+        boolean second = bioStim && secondHarmonic.isChecked();
+        boolean third = bioStim && thirdHarmonic.isChecked();
+        audioService.engine().configureGenerator(!bioStim,
+            carrier, beat, second, third,
             generatorVolume.getProgress() / 100f, n, overlayVolume.getProgress() / 100f);
-        useVector = vectorMode.isChecked();
-        VectorProgram p = useVector ? loadedVector : null;
-        if (useVector && p == null) { toast("Încarcă mai întâi un vector CSV"); return; }
         long limit = Math.round(parseDouble(sessionMinutes, 20) * 60_000);
+        SharedPreferences.Editor settings = prefs().edit()
+            .putString(bioStim ? "biostim_carrier_hz" : "mindextra_carrier_hz",
+                Double.toString(carrier))
+            .putString(bioStim ? "biostim_session_minutes" : "mindextra_session_minutes",
+                sessionMinutes.getText().toString());
+        if (!bioStim) settings.putString("mindextra_beat_hz", Double.toString(beat));
+        settings.apply();
         audioService.enterForeground();
         audioService.engine().startGenerator(limit, p);
         audioService.setMusicVolume(overlayVolume.getProgress() / 100f);
         if (overlay == 4) audioService.startMusicIfSelected();
         else audioService.stopMusic();
         generatorWasActive = true;
+        return true;
+    }
+
+    private boolean generatorMatchesScreen(AudioEngine engine, boolean bioStim) {
+        return engine.isGeneratorActive() && engine.isBinaural() != bioStim;
     }
 
     private void stopGenerator() {
@@ -898,12 +932,24 @@ public final class MainActivity extends Activity {
                 AudioEngine e = audioService.engine();
                 if (status != null) {
                     String m = e.isMetronomeRunning() ? "Metronom activ" : "Metronom oprit";
-                    String g = e.isGeneratorActive() ? (e.isGeneratorPaused() ? "Generator în pauză" : "Generator activ") : "Generator oprit";
+                    String instrument = e.isBinaural() ? "MindExtra" : "BioStim";
+                    String g = e.isGeneratorActive()
+                        ? instrument + (e.isGeneratorPaused() ? " în pauză" : " activ")
+                        : "Generatoare oprite";
                     status.setText(m + "  •  " + g);
                 }
                 if (metroTimer != null) metroTimer.setText("Sesiune: " + formatTime(e.metronomeSessionMs()));
                 if (generatorTimer != null) {
-                    generatorTimer.setText("Sesiune: " + formatTime(e.generatorElapsedMs()) + " / " + formatTime(e.generatorLimitMs()));
+                    boolean bioStimScreen = currentScreen == SCREEN_BIOSTIM;
+                    if (generatorMatchesScreen(e, bioStimScreen)) {
+                        generatorTimer.setText("Sesiune: " + formatTime(e.generatorElapsedMs())
+                            + " / " + formatTime(e.generatorLimitMs()));
+                    } else if (e.isGeneratorActive()) {
+                        generatorTimer.setText((e.isBinaural() ? "MindExtra" : "BioStim")
+                            + " rulează în cealaltă filă");
+                    } else {
+                        generatorTimer.setText("Sesiune: 00:00 / 00:00");
+                    }
                 }
                 updateVectorStatus(e);
                 if (generatorWasActive && !e.isGeneratorActive()) {
@@ -922,7 +968,7 @@ public final class MainActivity extends Activity {
     };
 
     private void updateVectorStatus(AudioEngine engine) {
-        if (!showGenerator || beatDial == null || vectorStage == null) return;
+        if (currentScreen != SCREEN_MINDEXTRA || beatDial == null || vectorStage == null) return;
         if (!engine.isVectorActive()) {
             vectorStage.setText(useVector && loadedVector != null ? "Vector pregătit" : "Vector inactiv");
             return;
@@ -984,7 +1030,8 @@ public final class MainActivity extends Activity {
     }
 
     private void updateStrobe() {
-        if (!showGenerator || strobe == null || !strobe.isChecked() || !audioService.engine().isGeneratorActive()
+        if (currentScreen != SCREEN_MINDEXTRA || strobe == null || !strobe.isChecked()
+            || !audioService.engine().isGeneratorActive() || !audioService.engine().isBinaural()
             || audioService.engine().isGeneratorPaused()) {
             root.setBackgroundColor(Color.BLACK);
             return;
@@ -1011,7 +1058,7 @@ public final class MainActivity extends Activity {
 
     private void applyKeepScreenOn() {
         boolean forceScreenOff = prefs().getBoolean("energy_screen_off", false);
-        boolean keepCurrentScreenOn = showGenerator ? keepGenerator : keepMetro;
+        boolean keepCurrentScreenOn = currentScreen == SCREEN_METRONOME ? keepMetro : keepGenerator;
         if (!forceScreenOff && keepCurrentScreenOn) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         } else {
@@ -1103,15 +1150,6 @@ public final class MainActivity extends Activity {
 
     private CheckBox check(String value, boolean checked) {
         CheckBox b = new CheckBox(this);
-        b.setText(value);
-        b.setTextColor(Color.WHITE);
-        b.setChecked(checked);
-        return b;
-    }
-
-    private RadioButton radio(String value, boolean checked) {
-        RadioButton b = new RadioButton(this);
-        b.setId(View.generateViewId());
         b.setText(value);
         b.setTextColor(Color.WHITE);
         b.setChecked(checked);

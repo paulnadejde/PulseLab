@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.15
+
+- separă generatorul monoaural și generatorul binaural în filele BioStim și MindExtra;
+- elimină selectorul Monoaural/Binaural: START din instrumentul ales stabilește modul audio;
+- păstrează sunetul curent neschimbat la simpla navigare între file;
+- limitează componentele suplimentare și preseturile de frecvențe la BioStim;
+- limitează vectorii CSV, graficul și stroboscopul la MindExtra;
+- memorează separat frecvențele și durata sesiunii celor două instrumente;
+- mută Catalog Online lângă sunetele locale, fiind comun vectorilor și pieselor audio.
+
+
 ## 0.1.14
 
 - conectează butonul Help la catalogul online de documentație AquaRitm;
