@@ -43,6 +43,8 @@ public final class AudioEngine {
     private volatile boolean useCustomThirdFrequency;
     private volatile double customSecondFrequencyHz = 440.0;
     private volatile double customThirdFrequencyHz = 660.0;
+    private volatile float monoSecondLevel = 0.20f;
+    private volatile float monoThirdLevel = 0.20f;
     private volatile double carrierHz = 220.0;
     private volatile double beatHz = 10.0;
     private volatile float generatorVolume = 0.25f;
@@ -78,6 +80,12 @@ public final class AudioEngine {
     public boolean usesCustomThirdFrequency() { return useCustomThirdFrequency; }
     public double customSecondFrequencyHz() { return customSecondFrequencyHz; }
     public double customThirdFrequencyHz() { return customThirdFrequencyHz; }
+    public float monoSecondLevel() { return monoSecondLevel; }
+    public float monoThirdLevel() { return monoThirdLevel; }
+    public void setMonoComponentLevels(float secondLevel, float thirdLevel) {
+        monoSecondLevel = clamp01(secondLevel);
+        monoThirdLevel = clamp01(thirdLevel);
+    }
     public void setMonoFrequencyOverrides(boolean useSecond, double secondHz,
                                           boolean useThird, double thirdHz) {
         useCustomSecondFrequency = useSecond;
@@ -283,7 +291,9 @@ public final class AudioEngine {
                     }
 
                     double sample = HarmonicMixer.mix(
-                        Math.sin(monoPhase), second, secondSample, third, thirdSample)
+                        Math.sin(monoPhase),
+                        second, secondSample, monoSecondLevel,
+                        third, thirdSample, monoThirdLevel)
                         * generatorVolume;
                     left += sample;
                     right += sample;

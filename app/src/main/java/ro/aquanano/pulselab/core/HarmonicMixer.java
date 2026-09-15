@@ -5,18 +5,24 @@ public final class HarmonicMixer {
     private HarmonicMixer() { }
 
     public static double mix(double fundamentalSample,
-                             boolean secondEnabled, double secondSample,
-                             boolean thirdEnabled, double thirdSample) {
+                             boolean secondEnabled, double secondSample, double secondLevel,
+                             boolean thirdEnabled, double thirdSample, double thirdLevel) {
         double value = fundamentalSample;
-        int components = 1;
+        double normalization = 1.0;
         if (secondEnabled) {
-            value += secondSample;
-            components++;
+            double level = clamp01(secondLevel);
+            value += secondSample * level;
+            normalization += level;
         }
         if (thirdEnabled) {
-            value += thirdSample;
-            components++;
+            double level = clamp01(thirdLevel);
+            value += thirdSample * level;
+            normalization += level;
         }
-        return value / components;
+        return value / normalization;
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
     }
 }

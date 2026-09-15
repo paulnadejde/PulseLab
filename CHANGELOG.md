@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.12
+
+- adaugă volum independent 0–100% pentru fiecare componentă monoaurală, implicit 20%;
+- normalizează suma ponderată și memorează volumele împreună cu frecvențele personalizate;
+- adaugă presetul CSV cu cinci parametri pentru fundamentala și cele două componente opționale;
+- încarcă preseturi de frecvențe din catalog, le memorează și actualizează toate dialurile și volumele;
+- extinde catalogul bibliotecii cu directorul „frecvente” și SHA-256 pentru resurse.
+
+
 ## 0.1.11
 
 - conectează secțiunea Update la catalogul din directorul „aplicatie”;

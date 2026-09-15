@@ -35,9 +35,9 @@ public final class CoreTests {
         assert Math.abs(v4.at(11).carrierHz - 210) < 1e-9;
         assert Math.abs(v4.at(11).frequencyHz - 8) < 1e-9;
 
-        assert Math.abs(HarmonicMixer.mix(1.0, false, 0.7, false, -0.2) - 1.0) < 1e-9;
-        assert Math.abs(HarmonicMixer.mix(1.0, true, 0.0, false, -0.2) - 0.5) < 1e-9;
-        assert Math.abs(HarmonicMixer.mix(1.0, true, 0.0, true, -1.0)) < 1e-9;
+        assert Math.abs(HarmonicMixer.mix(1.0, false, 0.7, 0.2, false, -0.2, 0.2) - 1.0) < 1e-9;
+        assert Math.abs(HarmonicMixer.mix(1.0, true, 0.0, 0.2, false, -0.2, 0.2) - 0.5) < 1e-9;
+        assert Math.abs(HarmonicMixer.mix(1.0, true, 0.0, 1.0, true, -1.0, 1.0)) < 1e-9;
 
         assert VersionLogic.isValid("0.1.10");
         assert !VersionLogic.isValid("release");
@@ -47,18 +47,39 @@ public final class CoreTests {
         assert VersionLogic.isNewer("0.1.11", "0.1.10");
         assert !VersionLogic.isNewer("0.1.9", "0.1.10");
 
+        String frequencyCsv =
+            "# Frecvență test\n"
+                + "fundamental_hz,frequency_2_hz,volume_2_percent,frequency_3_hz,volume_3_percent\n"
+                + "220.0,440.0,20,660.0,15\n";
+        FrequencyPreset frequencyPreset =
+            FrequencyPreset.parseCsv(new StringReader(frequencyCsv));
+        assert Math.abs(frequencyPreset.fundamentalHz - 220.0) < 1e-9;
+        assert frequencyPreset.hasSecond();
+        assert Math.abs(frequencyPreset.secondVolumePercent - 20.0) < 1e-9;
+        assert frequencyPreset.hasThird();
+        assert Math.abs(frequencyPreset.thirdVolumePercent - 15.0) < 1e-9;
+
+        String oneComponent =
+            "fundamental_hz,frequency_2_hz,volume_2_percent,frequency_3_hz,volume_3_percent\n"
+                + "180.0,360.0,20,,\n";
+        FrequencyPreset one = FrequencyPreset.parseCsv(new StringReader(oneComponent));
+        assert one.hasSecond();
+        assert !one.hasThird();
+        assert Math.abs(HarmonicMixer.mix(1.0, true, 1.0, 0.2, false, 0.0, 0.2)
+            - 1.0) < 1e-9;
+
         for (int i = 0; i < 10_000; i++) {
             double fundamental = Math.sin(i * 0.017);
             double second = Math.sin(i * 0.031);
             double third = Math.sin(i * 0.047);
             assert Math.abs(HarmonicMixer.mix(
-                fundamental, false, second, false, third)) <= 1.0;
+                fundamental, false, second, 0.2, false, third, 0.2)) <= 1.0;
             assert Math.abs(HarmonicMixer.mix(
-                fundamental, true, second, false, third)) <= 1.0;
+                fundamental, true, second, 0.2, false, third, 0.2)) <= 1.0;
             assert Math.abs(HarmonicMixer.mix(
-                fundamental, false, second, true, third)) <= 1.0;
+                fundamental, false, second, 0.2, true, third, 0.2)) <= 1.0;
             assert Math.abs(HarmonicMixer.mix(
-                fundamental, true, second, true, third)) <= 1.0;
+                fundamental, true, second, 0.2, true, third, 0.2)) <= 1.0;
         }
         System.out.println("Core tests passed");
     }

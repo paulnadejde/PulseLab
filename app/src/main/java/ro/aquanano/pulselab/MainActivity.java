@@ -43,9 +43,11 @@ import org.json.JSONObject;
 
 import java.io.InputStreamReader;
 import java.io.FileReader;
+import java.io.StringReader;
 import java.util.List;
 import java.util.Locale;
 
+import ro.aquanano.pulselab.core.FrequencyPreset;
 import ro.aquanano.pulselab.core.MetronomeLogic;
 import ro.aquanano.pulselab.core.VectorProgram;
 
@@ -53,6 +55,7 @@ public final class MainActivity extends Activity {
     private static final int PICK_VECTOR = 1001;
     private static final int PICK_MUSIC = 1002;
     private static final int PICK_ONLINE_PRESET = 1003;
+    private static final int PICK_FREQUENCY_PRESET = 1004;
     private static final int ACCENT = Color.rgb(69, 214, 196);
     private static final int PANEL = Color.rgb(21, 21, 21);
 
@@ -82,6 +85,11 @@ public final class MainActivity extends Activity {
     private CheckBox thirdHarmonic;
     private Button secondFrequencyButton;
     private Button thirdFrequencyButton;
+    private Button frequencyPresetButton;
+    private CheckBox useFrequencyPreset;
+    private TextView frequencyPresetLabel;
+    private FrequencyPreset loadedFrequencyPreset;
+    private String loadedFrequencyPresetName;
     private SeekBar generatorVolume;
     private SeekBar overlayVolume;
     private Spinner noiseType;
@@ -326,18 +334,37 @@ public final class MainActivity extends Activity {
             audioService.engine().customSecondFrequencyHz());
         double thirdHz = preferenceDouble("mono_h3_hz",
             audioService.engine().customThirdFrequencyHz());
+        int secondLevel = Math.max(0, Math.min(100,
+            prefs().getInt("mono_h2_volume", 20)));
+        int thirdLevel = Math.max(0, Math.min(100,
+            prefs().getInt("mono_h3_volume", 20)));
         audioService.engine().setMonoHarmonics(secondEnabled, thirdEnabled);
         audioService.engine().setMonoFrequencyOverrides(
             customSecond, secondHz, customThird, thirdHz);
+        audioService.engine().setMonoComponentLevels(
+            secondLevel / 100f, thirdLevel / 100f);
+
+        loadedFrequencyPreset = storedFrequencyPreset();
+        loadedFrequencyPresetName = prefs().getString(
+            "frequency_preset_name", "Niciun preset încărcat");
 
         secondHarmonic = check("Adaugă componenta a doua", secondEnabled);
         secondFrequencyButton = button(harmonicFrequencyButtonText(2));
         thirdHarmonic = check("Adaugă componenta a treia", thirdEnabled);
         thirdFrequencyButton = button(harmonicFrequencyButtonText(3));
+        frequencyPresetButton = button("ÎNCARCĂ PRESET DE FRECVENȚE");
+        useFrequencyPreset = check("Folosește presetul de frecvențe",
+            loadedFrequencyPreset != null
+                && prefs().getBoolean("frequency_preset_enabled", false));
+        frequencyPresetLabel = text(loadedFrequencyPresetName, 14);
+        frequencyPresetLabel.setTextColor(ACCENT);
         content.addView(secondHarmonic);
         content.addView(secondFrequencyButton);
         content.addView(thirdHarmonic);
         content.addView(thirdFrequencyButton);
+        content.addView(frequencyPresetButton);
+        content.addView(useFrequencyPreset);
+        content.addView(frequencyPresetLabel);
 
         boolean monoSelected = !audioService.engine().isBinaural();
         setHarmonicControlsEnabled(monoSelected);
@@ -351,6 +378,16 @@ public final class MainActivity extends Activity {
         });
         secondFrequencyButton.setOnClickListener(v -> showHarmonicFrequencyDialog(2));
         thirdFrequencyButton.setOnClickListener(v -> showHarmonicFrequencyDialog(3));
+        frequencyPresetButton.setOnClickListener(v ->
+            startActivityForResult(
+                new Intent(this, FrequencyCatalogActivity.class),
+                PICK_FREQUENCY_PRESET));
+        useFrequencyPreset.setOnCheckedChangeListener((button, checked) -> {
+            prefs().edit().putBoolean("frequency_preset_enabled", checked).apply();
+            if (checked && loadedFrequencyPreset != null) {
+                applyFrequencyPreset(loadedFrequencyPreset);
+            }
+        });
         audioMode.setOnCheckedChangeListener((group, checkedId) -> {
             boolean isBinaural = checkedId == binaural.getId();
             audioService.engine().setBinauralMode(isBinaural);
@@ -361,6 +398,9 @@ public final class MainActivity extends Activity {
         carrierDial = new DigitDialView(this, 1);
         carrierDial.setValue(audioService.engine().carrierHz());
         content.addView(carrierDial);
+        if (useFrequencyPreset.isChecked() && loadedFrequencyPreset != null) {
+            applyFrequencyPreset(loadedFrequencyPreset);
+        }
         title("Diferență / frecvență de bătaie (Hz)");
         beatDial = new DigitDialView(this, 2);
         beatDial.setValue(audioService.engine().currentBeatHz());
@@ -498,6 +538,12 @@ public final class MainActivity extends Activity {
         thirdHarmonic.setAlpha(enabled ? 1f : 0.4f);
         thirdFrequencyButton.setEnabled(enabled);
         thirdFrequencyButton.setAlpha(enabled ? 1f : 0.4f);
+        frequencyPresetButton.setEnabled(enabled);
+        frequencyPresetButton.setAlpha(enabled ? 1f : 0.4f);
+        boolean presetAvailable = enabled && loadedFrequencyPreset != null;
+        useFrequencyPreset.setEnabled(presetAvailable);
+        useFrequencyPreset.setAlpha(presetAvailable ? 1f : 0.4f);
+        frequencyPresetLabel.setAlpha(enabled ? 1f : 0.4f);
     }
 
     private String harmonicFrequencyButtonText(int order) {
@@ -505,13 +551,18 @@ public final class MainActivity extends Activity {
         boolean custom = second
             ? audioService.engine().usesCustomSecondFrequency()
             : audioService.engine().usesCustomThirdFrequency();
-        if (!custom) return second
-            ? "ALTĂ FRECVENȚĂ 2: standard 2 × f0"
-            : "ALTĂ FRECVENȚĂ 3: standard 3 × f0";
+        int level = Math.round((second
+            ? audioService.engine().monoSecondLevel()
+            : audioService.engine().monoThirdLevel()) * 100f);
+        if (!custom) return String.format(Locale.US,
+            second ? "ALTĂ FRECVENȚĂ 2: standard 2 × f0 • %d%%"
+                   : "ALTĂ FRECVENȚĂ 3: standard 3 × f0 • %d%%",
+            level);
         double hz = second
             ? audioService.engine().customSecondFrequencyHz()
             : audioService.engine().customThirdFrequencyHz();
-        return String.format(Locale.US, "ALTĂ FRECVENȚĂ %d: %.1f Hz", order, hz);
+        return String.format(Locale.US,
+            "ALTĂ FRECVENȚĂ %d: %.1f Hz • %d%%", order, hz, level);
     }
 
     private void showHarmonicFrequencyDialog(int order) {
@@ -522,6 +573,9 @@ public final class MainActivity extends Activity {
         boolean useCustom = second
             ? audioService.engine().usesCustomSecondFrequency()
             : audioService.engine().usesCustomThirdFrequency();
+        int currentLevel = Math.round((second
+            ? audioService.engine().monoSecondLevel()
+            : audioService.engine().monoThirdLevel()) * 100f);
 
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -529,8 +583,21 @@ public final class MainActivity extends Activity {
         DigitDialView frequency = new DigitDialView(this, 1);
         frequency.setValue(currentHz);
         CheckBox useFrequency = check("Folosește această frecvență", useCustom);
+        TextView levelLabel = text("Volum: " + currentLevel + "% din fundamentală", 15);
+        SeekBar level = new SeekBar(this);
+        level.setMax(100);
+        level.setProgress(currentLevel);
+        level.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
+                levelLabel.setText("Volum: " + value + "% din fundamentală");
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) { }
+            @Override public void onStopTrackingTouch(SeekBar bar) { }
+        });
         panel.addView(frequency);
         panel.addView(useFrequency);
+        panel.addView(levelLabel);
+        panel.addView(level);
 
         new AlertDialog.Builder(this)
             .setTitle(second ? "Componenta a doua" : "Componenta a treia")
@@ -539,13 +606,20 @@ public final class MainActivity extends Activity {
             .setPositiveButton("SALVEAZĂ", (dialog, which) -> {
                 double hz = frequency.getValue();
                 boolean selected = useFrequency.isChecked();
+                int volume = level.getProgress();
                 AudioEngine engine = audioService.engine();
+                float secondVolume = second
+                    ? volume / 100f : engine.monoSecondLevel();
+                float thirdVolume = second
+                    ? engine.monoThirdLevel() : volume / 100f;
+                engine.setMonoComponentLevels(secondVolume, thirdVolume);
                 if (second) {
                     engine.setMonoFrequencyOverrides(selected, hz,
                         engine.usesCustomThirdFrequency(), engine.customThirdFrequencyHz());
                     prefs().edit()
                         .putBoolean("mono_h2_custom", selected)
                         .putString("mono_h2_hz", Double.toString(hz))
+                        .putInt("mono_h2_volume", volume)
                         .apply();
                     secondFrequencyButton.setText(harmonicFrequencyButtonText(2));
                 } else {
@@ -555,11 +629,58 @@ public final class MainActivity extends Activity {
                     prefs().edit()
                         .putBoolean("mono_h3_custom", selected)
                         .putString("mono_h3_hz", Double.toString(hz))
+                        .putInt("mono_h3_volume", volume)
                         .apply();
                     thirdFrequencyButton.setText(harmonicFrequencyButtonText(3));
                 }
             })
             .show();
+    }
+
+    private FrequencyPreset storedFrequencyPreset() {
+        String csv = prefs().getString("frequency_preset_csv", "");
+        if (csv.isEmpty()) return null;
+        try {
+            return FrequencyPreset.parseCsv(new StringReader(csv));
+        } catch (Exception invalid) {
+            prefs().edit()
+                .remove("frequency_preset_csv")
+                .putBoolean("frequency_preset_enabled", false)
+                .apply();
+            return null;
+        }
+    }
+
+    private void applyFrequencyPreset(FrequencyPreset preset) {
+        if (preset == null || carrierDial == null) return;
+        carrierDial.setValue(preset.fundamentalHz);
+        secondHarmonic.setChecked(preset.hasSecond());
+        thirdHarmonic.setChecked(preset.hasThird());
+
+        AudioEngine engine = audioService.engine();
+        double secondHz = preset.hasSecond()
+            ? preset.secondFrequencyHz : engine.customSecondFrequencyHz();
+        double thirdHz = preset.hasThird()
+            ? preset.thirdFrequencyHz : engine.customThirdFrequencyHz();
+        engine.setMonoFrequencyOverrides(
+            preset.hasSecond(), secondHz, preset.hasThird(), thirdHz);
+        engine.setMonoComponentLevels(
+            (float) (preset.secondVolumePercent / 100.0),
+            (float) (preset.thirdVolumePercent / 100.0));
+
+        prefs().edit()
+            .putBoolean("mono_h2_enabled", preset.hasSecond())
+            .putBoolean("mono_h3_enabled", preset.hasThird())
+            .putBoolean("mono_h2_custom", preset.hasSecond())
+            .putBoolean("mono_h3_custom", preset.hasThird())
+            .putString("mono_h2_hz", Double.toString(secondHz))
+            .putString("mono_h3_hz", Double.toString(thirdHz))
+            .putInt("mono_h2_volume", (int) Math.round(preset.secondVolumePercent))
+            .putInt("mono_h3_volume", (int) Math.round(preset.thirdVolumePercent))
+            .apply();
+        secondFrequencyButton.setText(harmonicFrequencyButtonText(2));
+        thirdFrequencyButton.setText(harmonicFrequencyButtonText(3));
+        frequencyPresetLabel.setText(loadedFrequencyPresetName);
     }
 
     private double preferenceDouble(String key, double fallback) {
@@ -642,6 +763,10 @@ public final class MainActivity extends Activity {
     }
 
     private void startGenerator() {
+        if (useFrequencyPreset != null && useFrequencyPreset.isChecked()
+            && loadedFrequencyPreset != null) {
+            applyFrequencyPreset(loadedFrequencyPreset);
+        }
         double carrier = carrierDial.getValue();
         double beat = beatDial.getValue();
         if (carrier < 0.1) { toast("Purtătoarea trebuie să fie peste 0 Hz"); return; }
@@ -686,6 +811,27 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_FREQUENCY_PRESET
+            && resultCode == RESULT_OK && data != null) {
+            String csv = data.getStringExtra(FrequencyCatalogActivity.RESULT_CSV);
+            String name = data.getStringExtra(FrequencyCatalogActivity.RESULT_NAME);
+            try {
+                FrequencyPreset preset = FrequencyPreset.parseCsv(new StringReader(csv));
+                loadedFrequencyPreset = preset;
+                loadedFrequencyPresetName = name == null || name.trim().isEmpty()
+                    ? "Preset de frecvențe" : name.trim();
+                prefs().edit()
+                    .putString("frequency_preset_csv", csv)
+                    .putString("frequency_preset_name", loadedFrequencyPresetName)
+                    .putBoolean("frequency_preset_enabled", true)
+                    .apply();
+                toast("Preset încărcat: " + loadedFrequencyPresetName);
+                renderCurrentScreen();
+            } catch (Exception error) {
+                toast("Preset de frecvențe invalid: " + error.getMessage());
+            }
+            return;
+        }
         if (requestCode == PICK_ONLINE_PRESET && resultCode == RESULT_OK && data != null) {
             String id = data.getStringExtra(PresetCatalogActivity.RESULT_PRESET_ID);
             String type = data.getStringExtra(PresetCatalogActivity.RESULT_RESOURCE_TYPE);

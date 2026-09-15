@@ -45,6 +45,7 @@ function aquaritm_files(string $directory, string $webDirectory, array $extensio
             'id' => $id,
             'name' => $displayName,
             $field => $webDirectory . '/' . rawurlencode($filename),
+            $field . '_sha256' => hash_file('sha256', $path),
             'size_bytes' => filesize($path),
             'modified_at' => gmdate('c', (int) filemtime($path)),
         ];
@@ -66,6 +67,12 @@ $payload = [
         'audio',
         ['wav', 'ogg', 'mp3', 'm4a', 'aac', 'flac'],
         'audio'
+    ),
+    'frequencies' => aquaritm_files(
+        __DIR__ . '/frecvente',
+        'frecvente',
+        ['csv'],
+        'frequency'
     ),
 ];
 
