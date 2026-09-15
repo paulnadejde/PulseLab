@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.20
+
+- înlocuiește etichetele celor patru file cu butoane pătrate și pictograme dedicate;
+- mută sursa locației și coordonatele manuale într-o fereastră separată de setări SolaRitm;
+- adaugă selectorul memorat „Doar răsărit” / „Răsărit și apus”;
+- introduce două cicluri simbolice 5→1, cu pași de 24 minute și 4 minute 48 secunde;
+- resetează ambele cicluri exact la evenimentele solare selectate și păstrează faza după repornire;
+- afișează ciclurile prin oval indigo, cerc verde, triunghi roșu, semilună argintie și pătrat galben.
+
+
 ## 0.1.19
 
 - adaugă fila SolaRitm pentru calculul local al răsăritului și apusului;

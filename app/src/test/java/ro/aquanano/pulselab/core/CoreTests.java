@@ -95,6 +95,18 @@ public final class CoreTests {
         assert winter.sunrise.atZone(winter.zone).getHour() == 7;
         assert winter.sunset.atZone(winter.zone).getHour() == 16;
 
+        java.time.Instant reset = java.time.Instant.parse("2026-09-15T04:00:00Z");
+        SolarCycle.State cycle = SolarCycle.at(reset, reset);
+        assert cycle.large == 5 && cycle.small == 5;
+        cycle = SolarCycle.at(reset, reset.plusSeconds(4 * 60 + 47));
+        assert cycle.large == 5 && cycle.small == 5;
+        cycle = SolarCycle.at(reset, reset.plusSeconds(4 * 60 + 48));
+        assert cycle.large == 5 && cycle.small == 4;
+        cycle = SolarCycle.at(reset, reset.plusSeconds(24 * 60));
+        assert cycle.large == 4 && cycle.small == 5;
+        cycle = SolarCycle.at(reset, reset.plusSeconds(5 * 24 * 60));
+        assert cycle.large == 5 && cycle.small == 5;
+
         for (int i = 0; i < 10_000; i++) {
             double fundamental = Math.sin(i * 0.017);
             double second = Math.sin(i * 0.031);

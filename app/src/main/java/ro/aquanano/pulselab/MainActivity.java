@@ -36,7 +36,9 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.widget.Space;
 import android.widget.Spinner;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -60,6 +62,7 @@ import java.util.Locale;
 import ro.aquanano.pulselab.core.FrequencyPreset;
 import ro.aquanano.pulselab.core.MetronomeLogic;
 import ro.aquanano.pulselab.core.SolarCalculator;
+import ro.aquanano.pulselab.core.SolarCycle;
 import ro.aquanano.pulselab.core.VectorProgram;
 
 public final class MainActivity extends Activity {
@@ -134,11 +137,18 @@ public final class MainActivity extends Activity {
     private TextView solarSunset;
     private TextView solarPhase;
     private TextView solarNextEvent;
+    private Switch solarUseSunsetSwitch;
+    private TextView solarSunriseOnlyLabel;
+    private TextView solarSunriseSunsetLabel;
+    private SolarGlyphView solarLargeGlyph;
+    private SolarGlyphView solarSmallGlyph;
     private double solarLatitude = Double.NaN;
     private double solarLongitude = Double.NaN;
     private String solarCalculationKey;
     private SolarCalculator.Events solarEvents;
+    private SolarCalculator.Events solarYesterdayEvents;
     private SolarCalculator.Events solarTomorrowEvents;
+    private Instant solarCycleAnchor;
 
     private final LocationListener solarLocationListener = new LocationListener() {
         @Override public void onLocationChanged(Location location) {
@@ -234,24 +244,39 @@ public final class MainActivity extends Activity {
         solarSunset = null;
         solarPhase = null;
         solarNextEvent = null;
+        solarLatitudeInput = null;
+        solarLongitudeInput = null;
+        solarRefreshLocation = null;
+        solarUseSunsetSwitch = null;
+        solarSunriseOnlyLabel = null;
+        solarSunriseSunsetLabel = null;
+        solarLargeGlyph = null;
+        solarSmallGlyph = null;
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(12), dp(8), dp(12), dp(18));
         root.addView(page, match());
 
         LinearLayout tabs = horizontal();
-        Button metroTab = tabButton("METRONOM", currentScreen == SCREEN_METRONOME);
-        Button bioStimTab = tabButton("BIOSTIM", currentScreen == SCREEN_BIOSTIM);
-        Button mindExtraTab = tabButton("MINDEXTRA", currentScreen == SCREEN_MINDEXTRA);
-        Button solaRitmTab = tabButton("SOLARITM", currentScreen == SCREEN_SOLARITM);
+        tabs.setGravity(Gravity.CENTER);
+        NavigationIconView metroTab = new NavigationIconView(this,
+            NavigationIconView.METRONOME, currentScreen == SCREEN_METRONOME, "Metronom");
+        NavigationIconView bioStimTab = new NavigationIconView(this,
+            NavigationIconView.BIOSTIM, currentScreen == SCREEN_BIOSTIM, "BioStim");
+        NavigationIconView mindExtraTab = new NavigationIconView(this,
+            NavigationIconView.MINDEXTRA, currentScreen == SCREEN_MINDEXTRA, "MindExtra");
+        NavigationIconView solaRitmTab = new NavigationIconView(this,
+            NavigationIconView.SOLARITM, currentScreen == SCREEN_SOLARITM, "SolaRitm");
         Button settingsButton = button("☰");
         settingsButton.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
         settingsButton.setTextSize(18);
         settingsButton.setContentDescription("Setări AquaRitm");
-        tabs.addView(metroTab, weightedButton());
-        tabs.addView(bioStimTab, weightedButton());
-        tabs.addView(mindExtraTab, weightedButton());
-        tabs.addView(solaRitmTab, weightedButton());
+        int iconSize = Math.min(dp(62),
+            (getResources().getDisplayMetrics().widthPixels - dp(24 + 60)) / 4);
+        tabs.addView(metroTab, squareTabParams(iconSize));
+        tabs.addView(bioStimTab, squareTabParams(iconSize));
+        tabs.addView(mindExtraTab, squareTabParams(iconSize));
+        tabs.addView(solaRitmTab, squareTabParams(iconSize));
         LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(dp(44), dp(40));
         menuParams.setMargins(dp(3), dp(3), dp(3), dp(3));
         tabs.addView(settingsButton, menuParams);
@@ -654,43 +679,6 @@ public final class MainActivity extends Activity {
         note.setTextColor(Color.LTGRAY);
         content.addView(note);
 
-        title("Sursa coordonatelor");
-        solarLocationMode = spinner(new String[]{
-            "Locația telefonului", "Coordonate manuale"
-        });
-        boolean usePhone = prefs().getBoolean("solar_use_phone_location", true);
-        solarLocationMode.setSelection(usePhone ? 0 : 1);
-        content.addView(solarLocationMode);
-
-        solarLocationStatus = text("Aștept coordonatele…", 15);
-        solarLocationStatus.setTextColor(ACCENT);
-        content.addView(solarLocationStatus);
-
-        LinearLayout coordinates = horizontal();
-        solarLatitudeInput = coordinateInput(
-            prefs().getString("solar_manual_latitude", ""), "Latitudine");
-        solarLongitudeInput = coordinateInput(
-            prefs().getString("solar_manual_longitude", ""), "Longitudine");
-        LinearLayout.LayoutParams coordinateParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
-        coordinateParams.setMargins(dp(4), dp(3), dp(4), dp(3));
-        coordinates.addView(solarLatitudeInput, coordinateParams);
-        LinearLayout.LayoutParams longitudeParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
-        longitudeParams.setMargins(dp(4), dp(3), dp(4), dp(3));
-        coordinates.addView(solarLongitudeInput, longitudeParams);
-        content.addView(coordinates);
-
-        Button remember = button("MEMOREAZĂ COORDONATE NOI");
-        remember.setOnClickListener(v -> saveManualSolarCoordinates());
-        content.addView(remember);
-        solarRefreshLocation = button("ACTUALIZEAZĂ LOCAȚIA");
-        solarRefreshLocation.setOnClickListener(v -> startSolarLocationUpdates());
-        content.addView(solarRefreshLocation);
-
-        title("Astăzi");
-        solarSystemStatus = text("", 14);
-        solarSystemStatus.setTextColor(Color.LTGRAY);
-        content.addView(solarSystemStatus);
-
         solarSunrise = text("Răsărit: --:--", 24);
         solarSunrise.setTextColor(Color.rgb(255, 190, 72));
         solarSunset = text("Apus: --:--", 24);
@@ -704,19 +692,166 @@ public final class MainActivity extends Activity {
         content.addView(solarPhase);
         content.addView(solarNextEvent);
 
+        addSolarCyclePanel();
+
+        Button settings = button("SETĂRI SOLARITM");
+        settings.setOnClickListener(v -> showSolarSettingsDialog());
+        content.addView(settings);
+
         TextView accuracyNote = text(
             "Orele sunt estimări astronomice. Relieful, clădirile, altitudinea și condițiile atmosferice pot deplasa momentul observat.",
             13);
         accuracyNote.setTextColor(Color.LTGRAY);
         content.addView(accuracyNote);
 
-        setSolarLocationMode(usePhone);
+        setSolarLocationMode(prefs().getBoolean("solar_use_phone_location", true));
+    }
+
+    private void addSolarCyclePanel() {
+        int available = getResources().getDisplayMetrics().widthPixels - dp(48);
+        int size = Math.min(dp(320), available);
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER);
+        panel.setPadding(dp(12), dp(14), dp(12), dp(14));
+        GradientDrawable frame = new GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            new int[]{Color.rgb(35, 29, 20), Color.rgb(17, 16, 16)});
+        frame.setCornerRadius(dp(12));
+        frame.setStroke(dp(3), Color.rgb(207, 160, 57));
+        panel.setBackground(frame);
+        panel.setElevation(dp(7));
+        LinearLayout.LayoutParams panelParams = new LinearLayout.LayoutParams(size, size);
+        panelParams.gravity = Gravity.CENTER_HORIZONTAL;
+        panelParams.setMargins(dp(4), dp(14), dp(4), dp(10));
+
+        TextView selectorTitle = text("Resetarea ciclului", 13);
+        selectorTitle.setGravity(Gravity.CENTER);
+        selectorTitle.setTextColor(Color.rgb(225, 190, 105));
+        panel.addView(selectorTitle, new LinearLayout.LayoutParams(-1, dp(34)));
+
+        LinearLayout selector = horizontal();
+        solarSunriseOnlyLabel = text("Doar răsărit", 12);
+        solarSunriseOnlyLabel.setGravity(Gravity.CENTER);
+        solarSunriseSunsetLabel = text("Răsărit și apus", 12);
+        solarSunriseSunsetLabel.setGravity(Gravity.CENTER);
+        solarUseSunsetSwitch = new Switch(this);
+        solarUseSunsetSwitch.setShowText(false);
+        boolean includeSunset = prefs().getBoolean("solar_cycle_uses_sunset", false);
+        solarUseSunsetSwitch.setChecked(includeSunset);
+        selector.addView(solarSunriseOnlyLabel, new LinearLayout.LayoutParams(0, dp(54), 1f));
+        selector.addView(solarUseSunsetSwitch,
+            new LinearLayout.LayoutParams(dp(54), dp(54)));
+        selector.addView(solarSunriseSunsetLabel, new LinearLayout.LayoutParams(0, dp(54), 1f));
+        panel.addView(selector);
+        refreshSolarModeLabels(includeSunset);
+        solarUseSunsetSwitch.setOnCheckedChangeListener((button, checked) -> {
+            prefs().edit().putBoolean("solar_cycle_uses_sunset", checked).apply();
+            solarCalculationKey = null;
+            refreshSolarModeLabels(checked);
+            updateSolarDisplay();
+        });
+
+        LinearLayout glyphRow = horizontal();
+        glyphRow.setGravity(Gravity.CENTER);
+        solarLargeGlyph = new SolarGlyphView(this);
+        solarSmallGlyph = new SolarGlyphView(this);
+        glyphRow.addView(new Space(this), new LinearLayout.LayoutParams(0, 1, 1f));
+        glyphRow.addView(solarLargeGlyph,
+            new LinearLayout.LayoutParams(dp(124), dp(124)));
+        glyphRow.addView(new Space(this), new LinearLayout.LayoutParams(0, 1, 1f));
+        glyphRow.addView(solarSmallGlyph,
+            new LinearLayout.LayoutParams(dp(62), dp(62)));
+        glyphRow.addView(new Space(this), new LinearLayout.LayoutParams(0, 1, 1f));
+        panel.addView(glyphRow, new LinearLayout.LayoutParams(-1, 0, 1f));
+        content.addView(panel, panelParams);
+    }
+
+    private void refreshSolarModeLabels(boolean includeSunset) {
+        if (solarSunriseOnlyLabel == null || solarSunriseSunsetLabel == null) return;
+        solarSunriseOnlyLabel.setTextColor(includeSunset ? Color.GRAY : Color.WHITE);
+        solarSunriseSunsetLabel.setTextColor(includeSunset ? Color.WHITE : Color.GRAY);
+    }
+
+    private void showSolarSettingsDialog() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(18), dp(8), dp(18), dp(8));
+
+        panel.addView(text("Sursa coordonatelor", 16));
+        solarLocationMode = spinner(new String[]{"Locația telefonului", "Coordonate manuale"});
+        boolean usePhone = prefs().getBoolean("solar_use_phone_location", true);
+        solarLocationMode.setSelection(usePhone ? 0 : 1);
+        panel.addView(solarLocationMode);
+        solarLocationStatus = text(currentSolarLocationDescription(usePhone), 14);
+        solarLocationStatus.setTextColor(ACCENT);
+        panel.addView(solarLocationStatus);
+
+        LinearLayout coordinates = horizontal();
+        solarLatitudeInput = coordinateInput(
+            prefs().getString("solar_manual_latitude", ""), "Latitudine");
+        solarLongitudeInput = coordinateInput(
+            prefs().getString("solar_manual_longitude", ""), "Longitudine");
+        LinearLayout.LayoutParams coordinateParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
+        coordinateParams.setMargins(dp(4), dp(3), dp(4), dp(3));
+        coordinates.addView(solarLatitudeInput, coordinateParams);
+        LinearLayout.LayoutParams longitudeParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
+        longitudeParams.setMargins(dp(4), dp(3), dp(4), dp(3));
+        coordinates.addView(solarLongitudeInput, longitudeParams);
+        panel.addView(coordinates);
+
+        Button remember = button("MEMOREAZĂ COORDONATE NOI");
+        remember.setOnClickListener(v -> saveManualSolarCoordinates());
+        panel.addView(remember);
+        solarRefreshLocation = button("ACTUALIZEAZĂ LOCAȚIA");
+        solarRefreshLocation.setEnabled(usePhone);
+        solarRefreshLocation.setAlpha(usePhone ? 1f : .4f);
+        solarRefreshLocation.setOnClickListener(v -> startSolarLocationUpdates());
+        panel.addView(solarRefreshLocation);
+        solarSystemStatus = text("", 13);
+        solarSystemStatus.setTextColor(Color.LTGRAY);
+        panel.addView(solarSystemStatus);
+
         solarLocationMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                setSolarLocationMode(position == 0);
+                boolean selectedPhone = position == 0;
+                if (selectedPhone != prefs().getBoolean("solar_use_phone_location", true))
+                    setSolarLocationMode(selectedPhone);
             }
             @Override public void onNothingSelected(AdapterView<?> parent) { }
         });
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(panel);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle("Setări SolaRitm")
+            .setView(scroll)
+            .setPositiveButton("ÎNCHIDE", null)
+            .create();
+        dialog.setOnDismissListener(ignored -> {
+            solarLocationMode = null;
+            solarLatitudeInput = null;
+            solarLongitudeInput = null;
+            solarRefreshLocation = null;
+            solarLocationStatus = null;
+            solarSystemStatus = null;
+        });
+        dialog.show();
+        updateSolarDisplay();
+    }
+
+    private String currentSolarLocationDescription(boolean usePhone) {
+        if (!Double.isFinite(solarLatitude) || !Double.isFinite(solarLongitude))
+            return usePhone ? "Caut locația telefonului…" : "Nu sunt memorate coordonate manuale.";
+        String source = usePhone ? "Locația telefonului" : "Coordonate manuale memorate";
+        if (usePhone) {
+            String provider = prefs().getString("solar_phone_provider", "telefon");
+            float accuracy = prefs().getFloat("solar_phone_accuracy", -1f);
+            source += " • " + provider
+                + (accuracy >= 0 ? String.format(Locale.US, " • precizie ±%.0f m", accuracy) : "");
+        }
+        return String.format(Locale.US, "%s\nLat %.6f° • Long %.6f°",
+            source, solarLatitude, solarLongitude);
     }
 
     private EditText coordinateInput(String value, String hint) {
@@ -792,7 +927,14 @@ public final class MainActivity extends Activity {
         try {
             String lat = prefs().getString("solar_phone_latitude", "");
             String lon = prefs().getString("solar_phone_longitude", "");
-            if (lat.isEmpty() || lon.isEmpty()) return;
+            if (lat.isEmpty() || lon.isEmpty()) {
+                solarLatitude = Double.NaN;
+                solarLongitude = Double.NaN;
+                solarCalculationKey = null;
+                solarCycleAnchor = null;
+                clearSolarDisplay();
+                return;
+            }
             float accuracy = prefs().getFloat("solar_phone_accuracy", -1f);
             String provider = prefs().getString("solar_phone_provider", "telefon");
             String description = "Ultima locație memorată • " + provider
@@ -876,6 +1018,8 @@ public final class MainActivity extends Activity {
         if (solarSunset != null) solarSunset.setText("Apus: --:--");
         if (solarPhase != null) solarPhase.setText("Stare solară indisponibilă");
         if (solarNextEvent != null) solarNextEvent.setText("Următorul eveniment: --");
+        if (solarLargeGlyph != null) solarLargeGlyph.setValue(5);
+        if (solarSmallGlyph != null) solarSmallGlyph.setValue(5);
     }
 
     private void updateSolarDisplay() {
@@ -884,16 +1028,25 @@ public final class MainActivity extends Activity {
         ZonedDateTime now = ZonedDateTime.now();
         LocalDate date = now.toLocalDate();
         ZoneId zone = now.getZone();
-        String key = date + "|" + zone.getId() + "|" + solarLatitude + "|" + solarLongitude;
+        boolean includeSunset = prefs().getBoolean("solar_cycle_uses_sunset", false);
+        String key = date + "|" + zone.getId() + "|" + solarLatitude + "|" + solarLongitude
+            + "|" + includeSunset;
         if (!key.equals(solarCalculationKey)) {
             solarEvents = SolarCalculator.calculate(date, zone, solarLatitude, solarLongitude);
+            solarYesterdayEvents = SolarCalculator.calculate(date.minusDays(1), zone,
+                solarLatitude, solarLongitude);
             solarTomorrowEvents = SolarCalculator.calculate(date.plusDays(1), zone,
                 solarLatitude, solarLongitude);
+            solarCycleAnchor = latestSolarCycleAnchor(now, includeSunset);
             solarCalculationKey = key;
         }
-        solarSystemStatus.setText(String.format(Locale.US, "%s • %s • UTC%s",
-            date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), zone.getId(),
-            now.getOffset().getId().equals("Z") ? "+00:00" : now.getOffset().getId()));
+        advanceSolarCycleAnchor(now.toInstant(), includeSunset);
+        if (solarSystemStatus != null) {
+            solarSystemStatus.setText(String.format(Locale.US, "%s • %s • UTC%s",
+                date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), zone.getId(),
+                now.getOffset().getId().equals("Z") ? "+00:00" : now.getOffset().getId()));
+        }
+        updateSolarGlyphs(now.toInstant());
 
         if (!solarEvents.hasRiseAndSet()) {
             solarSunrise.setText("Răsărit: nu are loc astăzi");
@@ -926,6 +1079,44 @@ public final class MainActivity extends Activity {
         if (next == null) solarNextEvent.setText("Următorul eveniment: nedeterminat");
         else solarNextEvent.setText("Până la " + nextName + ": "
             + formatSolarCountdown(Duration.between(instant, next)));
+    }
+
+    private Instant latestSolarCycleAnchor(ZonedDateTime now, boolean includeSunset) {
+        Instant instant = now.toInstant();
+        LocalDate date = now.toLocalDate();
+        ZoneId zone = now.getZone();
+        for (int daysBack = 0; daysBack <= 370; daysBack++) {
+            SolarCalculator.Events events;
+            if (daysBack == 0) events = solarEvents;
+            else if (daysBack == 1) events = solarYesterdayEvents;
+            else events = SolarCalculator.calculate(date.minusDays(daysBack), zone,
+                solarLatitude, solarLongitude);
+            Instant latest = null;
+            if (events.sunrise != null && !events.sunrise.isAfter(instant)) latest = events.sunrise;
+            if (includeSunset && events.sunset != null && !events.sunset.isAfter(instant)
+                    && (latest == null || events.sunset.isAfter(latest))) latest = events.sunset;
+            if (latest != null) return latest;
+        }
+        return date.atStartOfDay(zone).toInstant();
+    }
+
+    private void advanceSolarCycleAnchor(Instant now, boolean includeSunset) {
+        if (solarEvents == null) return;
+        Instant candidate = null;
+        if (solarEvents.sunrise != null && !solarEvents.sunrise.isAfter(now))
+            candidate = solarEvents.sunrise;
+        if (includeSunset && solarEvents.sunset != null && !solarEvents.sunset.isAfter(now)
+                && (candidate == null || solarEvents.sunset.isAfter(candidate)))
+            candidate = solarEvents.sunset;
+        if (candidate != null && (solarCycleAnchor == null || candidate.isAfter(solarCycleAnchor)))
+            solarCycleAnchor = candidate;
+    }
+
+    private void updateSolarGlyphs(Instant now) {
+        if (solarCycleAnchor == null || solarLargeGlyph == null || solarSmallGlyph == null) return;
+        SolarCycle.State state = SolarCycle.at(solarCycleAnchor, now);
+        solarLargeGlyph.setValue(state.large);
+        solarSmallGlyph.setValue(state.small);
     }
 
     private static String formatSolarCountdown(Duration duration) {
@@ -1593,6 +1784,11 @@ public final class MainActivity extends Activity {
 
     private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0, dp(52), 1); }
     private LinearLayout.LayoutParams weightedButton() { return UiStyle.weightedButton(this); }
+    private LinearLayout.LayoutParams squareTabParams(int size) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+        params.setMargins(dp(2), dp(2), dp(2), dp(2));
+        return params;
+    }
     private FrameLayout.LayoutParams match() { return new FrameLayout.LayoutParams(-1, -1); }
     private LinearLayout.LayoutParams matchWidth() { return new LinearLayout.LayoutParams(-1, -2); }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
