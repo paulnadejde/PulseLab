@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.19
+
+- adaugă fila SolaRitm pentru calculul local al răsăritului și apusului;
+- folosește locația telefonului prin GPS, rețea sau furnizorul disponibil, numai cât timp aplicația rulează;
+- permite coordonate manuale memorate și păstrează sursa aleasă până la următoarea modificare;
+- preia automat data, ora și fusul orar din Android și actualizează starea solară în timp real;
+- afișează coordonatele active, precizia locației și timpul rămas până la următorul eveniment solar.
+
+
 ## 0.1.18
 
 - reduce lățimea tuturor dialurilor de frecvență la 75% din spațiul disponibil;

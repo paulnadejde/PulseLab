@@ -1,6 +1,9 @@
 package ro.aquanano.pulselab.core;
 
 import java.io.StringReader;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 
 public final class CoreTests {
     public static void main(String[] args) throws Exception {
@@ -76,6 +79,21 @@ public final class CoreTests {
             blankRejected = true;
         }
         assert blankRejected;
+
+        SolarCalculator.Events summer = SolarCalculator.calculate(
+            LocalDate.of(2026, 6, 21), ZoneId.of("Europe/Bucharest"), 44.4268, 26.1025);
+        assert summer.hasRiseAndSet();
+        ZonedDateTime summerRise = summer.sunrise.atZone(summer.zone);
+        ZonedDateTime summerSet = summer.sunset.atZone(summer.zone);
+        assert summerRise.getHour() == 5;
+        assert summerSet.getHour() == 21;
+        assert summer.sunrise.isBefore(summer.sunset);
+
+        SolarCalculator.Events winter = SolarCalculator.calculate(
+            LocalDate.of(2026, 12, 21), ZoneId.of("Europe/Bucharest"), 44.4268, 26.1025);
+        assert winter.hasRiseAndSet();
+        assert winter.sunrise.atZone(winter.zone).getHour() == 7;
+        assert winter.sunset.atZone(winter.zone).getHour() == 16;
 
         for (int i = 0; i < 10_000; i++) {
             double fundamental = Math.sin(i * 0.017);

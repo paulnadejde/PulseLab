@@ -14,6 +14,9 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -45,21 +48,30 @@ import java.io.InputStream;
 import java.io.FileReader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 
 import ro.aquanano.pulselab.core.FrequencyPreset;
 import ro.aquanano.pulselab.core.MetronomeLogic;
+import ro.aquanano.pulselab.core.SolarCalculator;
 import ro.aquanano.pulselab.core.VectorProgram;
 
 public final class MainActivity extends Activity {
     private static final int SCREEN_METRONOME = 0;
     private static final int SCREEN_BIOSTIM = 1;
     private static final int SCREEN_MINDEXTRA = 2;
+    private static final int SCREEN_SOLARITM = 3;
     private static final int PICK_VECTOR = 1001;
     private static final int PICK_MUSIC = 1002;
     private static final int PICK_ONLINE_PRESET = 1003;
     private static final int PICK_FREQUENCY_PRESET = 1004;
+    private static final int LOCATION_PERMISSION_REQUEST = 10;
     private static final int ACCENT = Color.rgb(69, 214, 196);
     private static final int PANEL = Color.rgb(21, 21, 21);
 
@@ -111,6 +123,44 @@ public final class MainActivity extends Activity {
     private CheckBox strobe;
     private Spinner strobeColor;
     private boolean generatorWasActive;
+    private LocationManager locationManager;
+    private Spinner solarLocationMode;
+    private EditText solarLatitudeInput;
+    private EditText solarLongitudeInput;
+    private Button solarRefreshLocation;
+    private TextView solarLocationStatus;
+    private TextView solarSystemStatus;
+    private TextView solarSunrise;
+    private TextView solarSunset;
+    private TextView solarPhase;
+    private TextView solarNextEvent;
+    private double solarLatitude = Double.NaN;
+    private double solarLongitude = Double.NaN;
+    private String solarCalculationKey;
+    private SolarCalculator.Events solarEvents;
+    private SolarCalculator.Events solarTomorrowEvents;
+
+    private final LocationListener solarLocationListener = new LocationListener() {
+        @Override public void onLocationChanged(Location location) {
+            if (currentScreen != SCREEN_SOLARITM
+                    || !prefs().getBoolean("solar_use_phone_location", true)) return;
+            prefs().edit()
+                .putString("solar_phone_latitude", Double.toString(location.getLatitude()))
+                .putString("solar_phone_longitude", Double.toString(location.getLongitude()))
+                .putFloat("solar_phone_accuracy", location.hasAccuracy() ? location.getAccuracy() : -1f)
+                .putString("solar_phone_provider", location.getProvider() == null ? "telefon" : location.getProvider())
+                .apply();
+            applySolarCoordinates(location.getLatitude(), location.getLongitude(),
+                phoneLocationDescription(location, false));
+        }
+
+        @Override public void onProviderEnabled(String provider) { }
+        @Override public void onProviderDisabled(String provider) {
+            if (solarLocationStatus != null && currentScreen == SCREEN_SOLARITM)
+                solarLocationStatus.setText("Furnizor indisponibil: " + provider);
+        }
+        @Override public void onStatusChanged(String provider, int status, Bundle extras) { }
+    };
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder binder) {
@@ -151,11 +201,24 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        stopSolarLocationUpdates();
         if (bound) unbindService(connection);
         super.onDestroy();
     }
 
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                                     int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != LOCATION_PERMISSION_REQUEST) return;
+        boolean granted = false;
+        for (int result : grantResults) granted |= result == PackageManager.PERMISSION_GRANTED;
+        if (granted) startSolarLocationUpdates();
+        else if (solarLocationStatus != null)
+            solarLocationStatus.setText("Locație refuzată de Android. Folosește coordonatele manuale.");
+    }
+
     private void renderCurrentScreen() {
+        stopSolarLocationUpdates();
         root.removeAllViews();
         root.setBackgroundColor(Color.BLACK);
         carrierDial = null;
@@ -164,6 +227,13 @@ public final class MainActivity extends Activity {
         vectorStage = null;
         strobe = null;
         generatorTimer = null;
+        solarLocationMode = null;
+        solarLocationStatus = null;
+        solarSystemStatus = null;
+        solarSunrise = null;
+        solarSunset = null;
+        solarPhase = null;
+        solarNextEvent = null;
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(12), dp(8), dp(12), dp(18));
@@ -173,6 +243,7 @@ public final class MainActivity extends Activity {
         Button metroTab = tabButton("METRONOM", currentScreen == SCREEN_METRONOME);
         Button bioStimTab = tabButton("BIOSTIM", currentScreen == SCREEN_BIOSTIM);
         Button mindExtraTab = tabButton("MINDEXTRA", currentScreen == SCREEN_MINDEXTRA);
+        Button solaRitmTab = tabButton("SOLARITM", currentScreen == SCREEN_SOLARITM);
         Button settingsButton = button("☰");
         settingsButton.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
         settingsButton.setTextSize(18);
@@ -180,6 +251,7 @@ public final class MainActivity extends Activity {
         tabs.addView(metroTab, weightedButton());
         tabs.addView(bioStimTab, weightedButton());
         tabs.addView(mindExtraTab, weightedButton());
+        tabs.addView(solaRitmTab, weightedButton());
         LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(dp(44), dp(40));
         menuParams.setMargins(dp(3), dp(3), dp(3), dp(3));
         tabs.addView(settingsButton, menuParams);
@@ -187,6 +259,7 @@ public final class MainActivity extends Activity {
         metroTab.setOnClickListener(v -> { currentScreen = SCREEN_METRONOME; renderCurrentScreen(); });
         bioStimTab.setOnClickListener(v -> { currentScreen = SCREEN_BIOSTIM; renderCurrentScreen(); });
         mindExtraTab.setOnClickListener(v -> { currentScreen = SCREEN_MINDEXTRA; renderCurrentScreen(); });
+        solaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_SOLARITM; renderCurrentScreen(); });
         settingsButton.setOnClickListener(v ->
             startActivity(new Intent(this, SettingsActivity.class)));
 
@@ -199,7 +272,9 @@ public final class MainActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(content, matchWidth());
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        if (!bound) {
+        if (currentScreen == SCREEN_SOLARITM) {
+            buildSolaRitm();
+        } else if (!bound) {
             content.addView(text("Inițializez motorul audio…", 18));
         } else if (currentScreen == SCREEN_BIOSTIM) {
             buildGenerator(true);
@@ -569,6 +644,306 @@ public final class MainActivity extends Activity {
         keep.setAlpha(forceScreenOff ? 0.55f : 1f);
         keep.setOnCheckedChangeListener((b, checked) -> { keepGenerator = checked; applyKeepScreenOn(); });
         content.addView(keep);
+    }
+
+    private void buildSolaRitm() {
+        title("SolaRitm • Răsărit și apus");
+        TextView note = text(
+            "Calcul local pentru limita convențională de −0,833°. Data, ora și fusul orar sunt preluate din Android.",
+            14);
+        note.setTextColor(Color.LTGRAY);
+        content.addView(note);
+
+        title("Sursa coordonatelor");
+        solarLocationMode = spinner(new String[]{
+            "Locația telefonului", "Coordonate manuale"
+        });
+        boolean usePhone = prefs().getBoolean("solar_use_phone_location", true);
+        solarLocationMode.setSelection(usePhone ? 0 : 1);
+        content.addView(solarLocationMode);
+
+        solarLocationStatus = text("Aștept coordonatele…", 15);
+        solarLocationStatus.setTextColor(ACCENT);
+        content.addView(solarLocationStatus);
+
+        LinearLayout coordinates = horizontal();
+        solarLatitudeInput = coordinateInput(
+            prefs().getString("solar_manual_latitude", ""), "Latitudine");
+        solarLongitudeInput = coordinateInput(
+            prefs().getString("solar_manual_longitude", ""), "Longitudine");
+        LinearLayout.LayoutParams coordinateParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
+        coordinateParams.setMargins(dp(4), dp(3), dp(4), dp(3));
+        coordinates.addView(solarLatitudeInput, coordinateParams);
+        LinearLayout.LayoutParams longitudeParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
+        longitudeParams.setMargins(dp(4), dp(3), dp(4), dp(3));
+        coordinates.addView(solarLongitudeInput, longitudeParams);
+        content.addView(coordinates);
+
+        Button remember = button("MEMOREAZĂ COORDONATE NOI");
+        remember.setOnClickListener(v -> saveManualSolarCoordinates());
+        content.addView(remember);
+        solarRefreshLocation = button("ACTUALIZEAZĂ LOCAȚIA");
+        solarRefreshLocation.setOnClickListener(v -> startSolarLocationUpdates());
+        content.addView(solarRefreshLocation);
+
+        title("Astăzi");
+        solarSystemStatus = text("", 14);
+        solarSystemStatus.setTextColor(Color.LTGRAY);
+        content.addView(solarSystemStatus);
+
+        solarSunrise = text("Răsărit: --:--", 24);
+        solarSunrise.setTextColor(Color.rgb(255, 190, 72));
+        solarSunset = text("Apus: --:--", 24);
+        solarSunset.setTextColor(Color.rgb(185, 103, 214));
+        content.addView(solarSunrise);
+        content.addView(solarSunset);
+
+        solarPhase = text("Stare solară indisponibilă", 18);
+        solarPhase.setTextColor(ACCENT);
+        solarNextEvent = text("Următorul eveniment: --", 16);
+        content.addView(solarPhase);
+        content.addView(solarNextEvent);
+
+        TextView accuracyNote = text(
+            "Orele sunt estimări astronomice. Relieful, clădirile, altitudinea și condițiile atmosferice pot deplasa momentul observat.",
+            13);
+        accuracyNote.setTextColor(Color.LTGRAY);
+        content.addView(accuracyNote);
+
+        setSolarLocationMode(usePhone);
+        solarLocationMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                setSolarLocationMode(position == 0);
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+    }
+
+    private EditText coordinateInput(String value, String hint) {
+        EditText input = new EditText(this);
+        input.setText(value);
+        input.setHint(hint);
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.GRAY);
+        input.setSingleLine(true);
+        input.setGravity(Gravity.CENTER);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+            | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        return input;
+    }
+
+    private void setSolarLocationMode(boolean usePhone) {
+        prefs().edit().putBoolean("solar_use_phone_location", usePhone).apply();
+        if (solarRefreshLocation != null) {
+            solarRefreshLocation.setEnabled(usePhone);
+            solarRefreshLocation.setAlpha(usePhone ? 1f : 0.4f);
+        }
+        if (usePhone) {
+            loadRememberedPhoneLocation();
+            startSolarLocationUpdates();
+        } else {
+            stopSolarLocationUpdates();
+            loadManualSolarCoordinates();
+        }
+    }
+
+    private void saveManualSolarCoordinates() {
+        try {
+            double latitude = parseCoordinate(solarLatitudeInput.getText().toString(), -90, 90);
+            double longitude = parseCoordinate(solarLongitudeInput.getText().toString(), -180, 180);
+            String lat = String.format(Locale.US, "%.6f", latitude);
+            String lon = String.format(Locale.US, "%.6f", longitude);
+            solarLatitudeInput.setText(lat);
+            solarLongitudeInput.setText(lon);
+            prefs().edit()
+                .putString("solar_manual_latitude", lat)
+                .putString("solar_manual_longitude", lon)
+                .apply();
+            toast("Coordonate memorate");
+            if (!prefs().getBoolean("solar_use_phone_location", true))
+                applySolarCoordinates(latitude, longitude, "Coordonate manuale memorate");
+        } catch (Exception error) {
+            toast("Coordonate invalide. Latitudine −90…90; longitudine −180…180.");
+        }
+    }
+
+    private void loadManualSolarCoordinates() {
+        String lat = prefs().getString("solar_manual_latitude", "");
+        String lon = prefs().getString("solar_manual_longitude", "");
+        if (lat.isEmpty() || lon.isEmpty()) {
+            solarLatitude = Double.NaN;
+            solarLongitude = Double.NaN;
+            solarCalculationKey = null;
+            if (solarLocationStatus != null)
+                solarLocationStatus.setText("Introdu coordonatele și apasă MEMOREAZĂ COORDONATE NOI.");
+            clearSolarDisplay();
+            return;
+        }
+        try {
+            applySolarCoordinates(parseCoordinate(lat, -90, 90), parseCoordinate(lon, -180, 180),
+                "Coordonate manuale memorate");
+        } catch (Exception error) {
+            clearSolarDisplay();
+        }
+    }
+
+    private void loadRememberedPhoneLocation() {
+        try {
+            String lat = prefs().getString("solar_phone_latitude", "");
+            String lon = prefs().getString("solar_phone_longitude", "");
+            if (lat.isEmpty() || lon.isEmpty()) return;
+            float accuracy = prefs().getFloat("solar_phone_accuracy", -1f);
+            String provider = prefs().getString("solar_phone_provider", "telefon");
+            String description = "Ultima locație memorată • " + provider
+                + (accuracy >= 0 ? String.format(Locale.US, " • precizie ±%.0f m", accuracy) : "");
+            applySolarCoordinates(Double.parseDouble(lat), Double.parseDouble(lon), description);
+        } catch (Exception ignored) { }
+    }
+
+    private void startSolarLocationUpdates() {
+        if (currentScreen != SCREEN_SOLARITM
+                || !prefs().getBoolean("solar_use_phone_location", true)) return;
+        boolean fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED;
+        boolean coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED;
+        if (!fine && !coarse) {
+            if (solarLocationStatus != null)
+                solarLocationStatus.setText("Acordă accesul la locație cât timp folosești aplicația.");
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_PERMISSION_REQUEST);
+            return;
+        }
+        if (locationManager == null)
+            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager == null) {
+            if (solarLocationStatus != null) solarLocationStatus.setText("Serviciul de locație nu este disponibil.");
+            return;
+        }
+
+        // Reînregistrarea este intenționată la apăsarea butonului de actualizare,
+        // dar același listener nu trebuie păstrat de mai multe ori.
+        stopSolarLocationUpdates();
+
+        Location best = null;
+        boolean listening = false;
+        for (String provider : locationManager.getProviders(true)) {
+            try {
+                Location last = locationManager.getLastKnownLocation(provider);
+                if (last != null && (best == null || last.getTime() > best.getTime())) best = last;
+                locationManager.requestLocationUpdates(provider, 15_000L, 100f,
+                    solarLocationListener, Looper.getMainLooper());
+                listening = true;
+            } catch (SecurityException | IllegalArgumentException ignored) { }
+        }
+        if (best != null) {
+            applySolarCoordinates(best.getLatitude(), best.getLongitude(),
+                phoneLocationDescription(best, true));
+        } else if (solarLocationStatus != null) {
+            solarLocationStatus.setText(listening
+                ? "Caut locația telefonului…" : "Activează locația telefonului sau folosește coordonate manuale.");
+        }
+    }
+
+    private void stopSolarLocationUpdates() {
+        if (locationManager == null) return;
+        try { locationManager.removeUpdates(solarLocationListener); }
+        catch (SecurityException ignored) { }
+    }
+
+    private String phoneLocationDescription(Location location, boolean cached) {
+        String provider = location.getProvider() == null ? "telefon" : location.getProvider();
+        return (cached ? "Locație recentă" : "Locația telefonului") + " • " + provider
+            + (location.hasAccuracy()
+                ? String.format(Locale.US, " • precizie ±%.0f m", location.getAccuracy()) : "");
+    }
+
+    private void applySolarCoordinates(double latitude, double longitude, String description) {
+        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return;
+        solarLatitude = latitude;
+        solarLongitude = longitude;
+        solarCalculationKey = null;
+        if (solarLocationStatus != null) {
+            solarLocationStatus.setText(String.format(Locale.US,
+                "%s\nLat %.6f° • Long %.6f°", description, latitude, longitude));
+        }
+        updateSolarDisplay();
+    }
+
+    private void clearSolarDisplay() {
+        if (solarSunrise != null) solarSunrise.setText("Răsărit: --:--");
+        if (solarSunset != null) solarSunset.setText("Apus: --:--");
+        if (solarPhase != null) solarPhase.setText("Stare solară indisponibilă");
+        if (solarNextEvent != null) solarNextEvent.setText("Următorul eveniment: --");
+    }
+
+    private void updateSolarDisplay() {
+        if (currentScreen != SCREEN_SOLARITM || solarSunrise == null
+                || !Double.isFinite(solarLatitude) || !Double.isFinite(solarLongitude)) return;
+        ZonedDateTime now = ZonedDateTime.now();
+        LocalDate date = now.toLocalDate();
+        ZoneId zone = now.getZone();
+        String key = date + "|" + zone.getId() + "|" + solarLatitude + "|" + solarLongitude;
+        if (!key.equals(solarCalculationKey)) {
+            solarEvents = SolarCalculator.calculate(date, zone, solarLatitude, solarLongitude);
+            solarTomorrowEvents = SolarCalculator.calculate(date.plusDays(1), zone,
+                solarLatitude, solarLongitude);
+            solarCalculationKey = key;
+        }
+        solarSystemStatus.setText(String.format(Locale.US, "%s • %s • UTC%s",
+            date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")), zone.getId(),
+            now.getOffset().getId().equals("Z") ? "+00:00" : now.getOffset().getId()));
+
+        if (!solarEvents.hasRiseAndSet()) {
+            solarSunrise.setText("Răsărit: nu are loc astăzi");
+            solarSunset.setText("Apus: nu are loc astăzi");
+            solarPhase.setText(solarEvents.polarDay ? "Soare deasupra orizontului toată ziua"
+                : "Soare sub orizont toată ziua");
+            solarNextEvent.setText("Următorul eveniment necesită calcul pentru o dată viitoare.");
+            return;
+        }
+
+        DateTimeFormatter clock = DateTimeFormatter.ofPattern("HH:mm:ss");
+        solarSunrise.setText("Răsărit: " + clock.format(solarEvents.sunrise.atZone(zone)));
+        solarSunset.setText("Apus: " + clock.format(solarEvents.sunset.atZone(zone)));
+        Instant instant = now.toInstant();
+        Instant next;
+        String nextName;
+        if (instant.isBefore(solarEvents.sunrise)) {
+            solarPhase.setText("Înainte de răsărit");
+            next = solarEvents.sunrise;
+            nextName = "răsărit";
+        } else if (instant.isBefore(solarEvents.sunset)) {
+            solarPhase.setText("Soarele este deasupra orizontului");
+            next = solarEvents.sunset;
+            nextName = "apus";
+        } else {
+            solarPhase.setText("După apus");
+            next = solarTomorrowEvents.sunrise;
+            nextName = "răsăritul de mâine";
+        }
+        if (next == null) solarNextEvent.setText("Următorul eveniment: nedeterminat");
+        else solarNextEvent.setText("Până la " + nextName + ": "
+            + formatSolarCountdown(Duration.between(instant, next)));
+    }
+
+    private static String formatSolarCountdown(Duration duration) {
+        long seconds = Math.max(0, duration.getSeconds());
+        long days = seconds / 86_400;
+        long hours = (seconds % 86_400) / 3_600;
+        long minutes = (seconds % 3_600) / 60;
+        long remaining = seconds % 60;
+        return days > 0
+            ? String.format(Locale.US, "%d zile %02d:%02d:%02d", days, hours, minutes, remaining)
+            : String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, remaining);
+    }
+
+    private static double parseCoordinate(String value, double minimum, double maximum) {
+        double parsed = Double.parseDouble(value.trim().replace(',', '.'));
+        if (!Double.isFinite(parsed) || parsed < minimum || parsed > maximum)
+            throw new IllegalArgumentException("coordinate");
+        return parsed;
     }
 
     private String harmonicFrequencyButtonText(int order) {
@@ -951,12 +1326,16 @@ public final class MainActivity extends Activity {
             if (bound) {
                 AudioEngine e = audioService.engine();
                 if (status != null) {
-                    String m = e.isMetronomeRunning() ? "Metronom activ" : "Metronom oprit";
-                    String instrument = e.isBinaural() ? "MindExtra" : "BioStim";
-                    String g = e.isGeneratorActive()
-                        ? instrument + (e.isGeneratorPaused() ? " în pauză" : " activ")
-                        : "Generatoare oprite";
-                    status.setText(m + "  •  " + g);
+                    if (currentScreen == SCREEN_SOLARITM) {
+                        status.setText("SolaRitm • calcul astronomic local");
+                    } else {
+                        String m = e.isMetronomeRunning() ? "Metronom activ" : "Metronom oprit";
+                        String instrument = e.isBinaural() ? "MindExtra" : "BioStim";
+                        String g = e.isGeneratorActive()
+                            ? instrument + (e.isGeneratorPaused() ? " în pauză" : " activ")
+                            : "Generatoare oprite";
+                        status.setText(m + "  •  " + g);
+                    }
                 }
                 if (metroTimer != null) metroTimer.setText("Sesiune: " + formatTime(e.metronomeSessionMs()));
                 if (generatorTimer != null) {
@@ -980,6 +1359,7 @@ public final class MainActivity extends Activity {
                 }
                 updateStrobe();
             }
+            if (currentScreen == SCREEN_SOLARITM) updateSolarDisplay();
             boolean strobeNeedsFastRefresh = strobe != null && strobe.isChecked();
             long delay = !strobeNeedsFastRefresh && prefs().getBoolean("energy_slow_ui", false)
                 ? 1000L : 50L;
@@ -1078,7 +1458,10 @@ public final class MainActivity extends Activity {
 
     private void applyKeepScreenOn() {
         boolean forceScreenOff = prefs().getBoolean("energy_screen_off", false);
-        boolean keepCurrentScreenOn = currentScreen == SCREEN_METRONOME ? keepMetro : keepGenerator;
+        boolean keepCurrentScreenOn = currentScreen == SCREEN_METRONOME
+            ? keepMetro
+            : (currentScreen == SCREEN_BIOSTIM || currentScreen == SCREEN_MINDEXTRA)
+                && keepGenerator;
         if (!forceScreenOff && keepCurrentScreenOn) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         } else {
