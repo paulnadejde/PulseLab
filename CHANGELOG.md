@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.18
+
+- reduce lățimea tuturor dialurilor de frecvență la 75% din spațiul disponibil;
+- aliniază dialurile la stânga în BioStim, MindExtra și ferestrele frecvențelor auxiliare;
+- lasă restul lățimii liber pentru derularea verticală a paginii.
+
+
 ## 0.1.17
 
 - reduce fontul tuturor butoanelor la 75% din dimensiunea anterioară;

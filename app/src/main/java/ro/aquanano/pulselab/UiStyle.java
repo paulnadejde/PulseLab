@@ -38,6 +38,15 @@ final class UiStyle {
         return params;
     }
 
+    static LinearLayout.LayoutParams frequencyDial(Context context) {
+        int available = context.getResources().getDisplayMetrics().widthPixels - dp(context, 24);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            Math.round(available * 0.75f), LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.gravity = Gravity.START;
+        params.setMargins(0, dp(context, 3), 0, dp(context, 3));
+        return params;
+    }
+
     static int dp(Context context, int value) {
         return Math.round(value * context.getResources().getDisplayMetrics().density);
     }

@@ -413,7 +413,7 @@ public final class MainActivity extends Activity {
         carrierDial.setValue(preferenceDouble(
             bioStim ? "biostim_carrier_hz" : "mindextra_carrier_hz",
             audioService.engine().carrierHz()));
-        content.addView(carrierDial);
+        content.addView(carrierDial, UiStyle.frequencyDial(this));
         if (bioStim && useFrequencyPreset.isChecked() && loadedFrequencyPreset != null) {
             applyFrequencyPreset(loadedFrequencyPreset);
         }
@@ -422,7 +422,7 @@ public final class MainActivity extends Activity {
             beatDial = new DigitDialView(this, 2);
             beatDial.setValue(preferenceDouble(
                 "mindextra_beat_hz", audioService.engine().currentBeatHz()));
-            content.addView(beatDial);
+            content.addView(beatDial, UiStyle.frequencyDial(this));
         }
 
         generatorVolume = volumeRow("Volum generator", Math.round(audioService.engine().generatorVolume() * 100));
@@ -619,7 +619,7 @@ public final class MainActivity extends Activity {
             @Override public void onStartTrackingTouch(SeekBar bar) { }
             @Override public void onStopTrackingTouch(SeekBar bar) { }
         });
-        panel.addView(frequency);
+        panel.addView(frequency, UiStyle.frequencyDial(this));
         panel.addView(useFrequency);
         panel.addView(levelLabel);
         panel.addView(level);
