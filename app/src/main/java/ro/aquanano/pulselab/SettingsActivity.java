@@ -35,6 +35,7 @@ import java.util.Locale;
 import ro.aquanano.pulselab.core.VersionLogic;
 
 public final class SettingsActivity extends Activity {
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 45;
     private static final int ACCENT = Color.rgb(69, 214, 196);
     private static final int PANEL = Color.rgb(25, 25, 25);
     private static final int BLUE = Color.rgb(33, 112, 165);
@@ -50,6 +51,8 @@ public final class SettingsActivity extends Activity {
     private TextView updateStatus;
     private boolean receiverRegistered;
     private boolean verifyingUpdate;
+    private CheckBox solarAgent;
+    private boolean changingSolarAgent;
 
     private final BroadcastReceiver downloadReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -113,14 +116,19 @@ public final class SettingsActivity extends Activity {
         disableStrobe.setOnCheckedChangeListener((v, checked) ->
             preferences.edit().putBoolean("energy_disable_strobe", checked).apply());
 
-        note(page, "Pentru radio, rețea, localizare și luminozitate, Android cere confirmarea ta în panoul sistemului.");
+        section(page, "Agent SolaRitm");
+        solarAgent = check("Afișează agentul SolaRitm în bara de notificări",
+            preferences.getBoolean(SolarAgentService.PREF_ENABLED, false));
+        page.addView(solarAgent);
+        solarAgent.setOnCheckedChangeListener((button, checked) -> {
+            if (!changingSolarAgent) changeSolarAgent(checked);
+        });
+        note(page, "Agentul rămâne activ în fundal și poate apărea și pe ecranul blocat. Android și setările telefonului decid dacă notificarea este vizibilă sub ceas sau numai în panoul de notificări.");
 
-        addSystemButton(page, "MOD AVION", Settings.ACTION_AIRPLANE_MODE_SETTINGS);
-        addSystemButton(page, "REȚELE, WI-FI ȘI DATE MOBILE", Settings.ACTION_WIRELESS_SETTINGS);
-        addSystemButton(page, "BLUETOOTH", Settings.ACTION_BLUETOOTH_SETTINGS);
-        addSystemButton(page, "LOCAȚIE", Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-        addSystemButton(page, "ECRAN ȘI LUMINOZITATE", Settings.ACTION_DISPLAY_SETTINGS);
-        addSystemButton(page, "ECONOMISIRE BATERIE", Settings.ACTION_BATTERY_SAVER_SETTINGS);
+        note(page, "Pentru radio, rețea, localizare și luminozitate, Android cere confirmarea ta în panoul sistemului.");
+        Button systemSettings = button("SETĂRI SISTEM", BLUE);
+        page.addView(systemSettings, fullButton());
+        systemSettings.setOnClickListener(v -> showSystemSettings());
 
         section(page, "Update");
         updateStatus = text("Versiunea instalată: " + installedVersion(), 14);
@@ -158,6 +166,65 @@ public final class SettingsActivity extends Activity {
     @Override protected void onDestroy() {
         if (receiverRegistered) unregisterReceiver(downloadReceiver);
         super.onDestroy();
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                                     int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != NOTIFICATION_PERMISSION_REQUEST) return;
+        boolean granted = grantResults.length > 0
+            && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        if (granted) {
+            enableSolarAgent();
+        } else {
+            changingSolarAgent = true;
+            if (solarAgent != null) solarAgent.setChecked(false);
+            changingSolarAgent = false;
+            Toast.makeText(this,
+                "Agentul are nevoie de permisiunea pentru notificări.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void changeSolarAgent(boolean enabled) {
+        if (enabled && Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                NOTIFICATION_PERMISSION_REQUEST);
+            return;
+        }
+        if (enabled) enableSolarAgent();
+        else {
+            preferences.edit().putBoolean(SolarAgentService.PREF_ENABLED, false).apply();
+            SolarAgentService.sync(this);
+        }
+    }
+
+    private void enableSolarAgent() {
+        preferences.edit().putBoolean(SolarAgentService.PREF_ENABLED, true).apply();
+        changingSolarAgent = true;
+        if (solarAgent != null) solarAgent.setChecked(true);
+        changingSolarAgent = false;
+        SolarAgentService.sync(this);
+    }
+
+    private void showSystemSettings() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(14), dp(8), dp(14), dp(8));
+        addSystemButton(panel, "MOD AVION", Settings.ACTION_AIRPLANE_MODE_SETTINGS);
+        addSystemButton(panel, "REȚELE, WI-FI ȘI DATE MOBILE", Settings.ACTION_WIRELESS_SETTINGS);
+        addSystemButton(panel, "BLUETOOTH", Settings.ACTION_BLUETOOTH_SETTINGS);
+        addSystemButton(panel, "LOCAȚIE", Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+        addSystemButton(panel, "ECRAN ȘI LUMINOZITATE", Settings.ACTION_DISPLAY_SETTINGS);
+        addSystemButton(panel, "ECONOMISIRE BATERIE", Settings.ACTION_BATTERY_SAVER_SETTINGS);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(panel);
+        new AlertDialog.Builder(this)
+            .setTitle("Setări sistem Android")
+            .setView(scroll)
+            .setPositiveButton("ÎNCHIDE", null)
+            .show();
     }
 
     private void addSystemButton(LinearLayout parent, String label, String action) {
@@ -421,6 +488,7 @@ public final class SettingsActivity extends Activity {
             .setNegativeButton("ANULEAZĂ", null)
             .setPositiveButton("ÎNCHIDE", (dialog, which) -> {
                 stopService(new Intent(this, AudioService.class));
+                stopService(new Intent(this, SolarAgentService.class));
                 finishAffinity();
             })
             .show();

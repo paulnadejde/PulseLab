@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.21
+
+- redesenează pictograma MindExtra ca profil uman cu creier auriu și halo discret;
+- mută comenzile Android pentru radio, rețea, Bluetooth, locație, ecran și baterie în fereastra „Setări sistem”;
+- adaugă agentul SolaRitm opțional în bara de notificări, cu cele două ideograme actualizate în fundal;
+- reconstruiește faza simbolurilor din ora sistemului după repaus sau relansarea serviciului;
+- declară notificarea publică pentru ecranul blocat, fără sunet, vibrații ori insignă;
+- oprește agentul împreună cu aplicația la comanda „Închide aplicația”.
+
+
 ## 0.1.20
 
 - înlocuiește etichetele celor patru file cu butoane pătrate și pictograme dedicate;

@@ -186,6 +186,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        if (getIntent().getBooleanExtra("open_solaritm", false)) currentScreen = SCREEN_SOLARITM;
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
         setContentView(root);
@@ -196,6 +197,7 @@ public final class MainActivity extends Activity {
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 9);
         }
+        SolarAgentService.sync(this);
         handler.post(uiTicker);
     }
 
@@ -207,6 +209,15 @@ public final class MainActivity extends Activity {
         }
         if (bound) renderCurrentScreen();
         else applyKeepScreenOn();
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra("open_solaritm", false)) {
+            currentScreen = SCREEN_SOLARITM;
+            renderCurrentScreen();
+        }
     }
 
     @Override protected void onDestroy() {

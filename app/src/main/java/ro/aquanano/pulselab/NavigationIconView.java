@@ -106,20 +106,43 @@ final class NavigationIconView extends View {
     private void drawBrain(Canvas canvas, float w, float h) {
         paint.setStyle(Paint.Style.FILL);
         paint.setShader(new RadialGradient(w * .5f, h * .5f, w * .38f,
-            new int[]{0x55fff3a0, 0x2279b9ff, 0x0079b9ff}, null, Shader.TileMode.CLAMP));
+            new int[]{0x66ffe79b, 0x22ffd45a, 0x00ffd45a}, null, Shader.TileMode.CLAMP));
         canvas.drawCircle(w * .5f, h * .5f, w * .38f, paint);
         paint.setShader(null);
-        paint.setColor(Color.rgb(236, 190, 64));
-        float r = w * .105f;
-        canvas.drawCircle(w * .40f, h * .40f, r, paint);
-        canvas.drawCircle(w * .53f, h * .36f, r, paint);
-        canvas.drawCircle(w * .62f, h * .47f, r, paint);
-        canvas.drawCircle(w * .39f, h * .55f, r, paint);
-        canvas.drawCircle(w * .52f, h * .58f, r, paint);
+        path.reset();
+        path.moveTo(w * .68f, h * .78f);
+        path.cubicTo(w * .65f, h * .67f, w * .68f, h * .57f, w * .72f, h * .48f);
+        path.cubicTo(w * .78f, h * .31f, w * .66f, h * .19f, w * .49f, h * .18f);
+        path.cubicTo(w * .31f, h * .17f, w * .23f, h * .28f, w * .22f, h * .42f);
+        path.lineTo(w * .15f, h * .53f);
+        path.lineTo(w * .22f, h * .58f);
+        path.lineTo(w * .19f, h * .64f);
+        path.lineTo(w * .26f, h * .68f);
+        path.cubicTo(w * .25f, h * .76f, w * .30f, h * .79f, w * .38f, h * .76f);
+        path.lineTo(w * .49f, h * .72f);
+        path.cubicTo(w * .53f, h * .77f, w * .55f, h * .82f, w * .57f, h * .86f);
+        path.lineTo(w * .74f, h * .86f);
+        path.close();
+        paint.setColor(Color.rgb(255, 226, 137));
+        canvas.drawPath(path, paint);
         paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setStrokeWidth(w * .045f);
+        paint.setColor(Color.rgb(218, 162, 35));
+        canvas.drawPath(path, paint);
+        path.reset();
+        path.moveTo(w * .31f, h * .39f);
+        path.cubicTo(w * .29f, h * .29f, w * .40f, h * .25f, w * .46f, h * .31f);
+        path.cubicTo(w * .49f, h * .23f, w * .61f, h * .25f, w * .61f, h * .34f);
+        path.cubicTo(w * .71f, h * .32f, w * .73f, h * .43f, w * .68f, h * .48f);
+        path.cubicTo(w * .74f, h * .55f, w * .66f, h * .63f, w * .59f, h * .58f);
+        path.cubicTo(w * .55f, h * .67f, w * .43f, h * .63f, w * .44f, h * .55f);
+        path.cubicTo(w * .35f, h * .59f, w * .28f, h * .51f, w * .33f, h * .45f);
+        canvas.drawPath(path, paint);
         paint.setStrokeWidth(w * .035f);
-        paint.setColor(Color.rgb(111, 76, 20));
-        canvas.drawLine(w * .50f, h * .30f, w * .50f, h * .66f, paint);
+        canvas.drawLine(w * .60f, h * .58f, w * .66f, h * .74f, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
     }
 
     private void drawSunrise(Canvas canvas, float w, float h) {

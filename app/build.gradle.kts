@@ -12,8 +12,8 @@ android {
         applicationId = "ro.aquanano.pulselab"
         minSdk = 26
         targetSdk = 34
-        versionCode = 21
-        versionName = "0.1.20"
+        versionCode = 22
+        versionName = "0.1.21"
     }
 
     signingConfigs {
