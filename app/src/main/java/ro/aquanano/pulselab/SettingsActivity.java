@@ -135,9 +135,10 @@ public final class SettingsActivity extends Activity {
         });
 
         section(page, "Help");
-        Button help = button("DESCHIDE AJUTORUL", Color.rgb(74, 74, 74));
+        Button help = button("DESCHIDE AJUTORUL", BLUE);
         page.addView(help, fullButton());
-        help.setOnClickListener(v -> placeholder("Help"));
+        help.setOnClickListener(v ->
+            startActivity(new Intent(this, DocumentationActivity.class)));
 
         section(page, "Aplicație");
         Button close = button("ÎNCHIDE APLICAȚIA", RED);
@@ -409,11 +410,6 @@ public final class SettingsActivity extends Activity {
     private static String humanSize(long bytes) {
         if (bytes < 1024L * 1024L) return String.format(Locale.US, "%.1f KB", bytes / 1024.0);
         return String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0));
-    }
-
-    private void placeholder(String name) {
-        Toast.makeText(this, "Secțiunea " + name + " va fi adăugată într-o versiune viitoare.",
-            Toast.LENGTH_LONG).show();
     }
 
     private void confirmClose() {

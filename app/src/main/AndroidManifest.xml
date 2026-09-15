@@ -34,6 +34,9 @@
         <activity
             android:name=".FrequencyCatalogActivity"
             android:exported="false" />
+        <activity
+            android:name=".DocumentationActivity"
+            android:exported="false" />
 
         <service
             android:name=".AudioService"

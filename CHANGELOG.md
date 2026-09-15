@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.14
+
+- conectează butonul Help la catalogul online de documentație AquaRitm;
+- afișează automat documentele disponibile, cu formatul și dimensiunea lor;
+- deschide documentele prin browserul sau vizualizatorul instalat în Android;
+- validează că documentele provin prin HTTPS de pe domeniul aquanano.eu.
+
+
 ## 0.1.13
 
 - face obligatorii toate cele cinci valori numerice din presetul de frecvențe;
