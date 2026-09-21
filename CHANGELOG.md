@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.24
+
+- recapturează baza multiplicativă după editarea manuală a oricărei secvențe;
+- resetează progresul multiplicativ când este definit un set nou de valori sau este încărcat un preset;
+- împiedică actualizările automate ale câmpurilor să fie confundate cu editări făcute de utilizator.
+
+
 ## 0.1.23
 
 - limitează reglajul aditiv la 1…10 secunde, în pași întregi;

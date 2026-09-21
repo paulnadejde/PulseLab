@@ -27,6 +27,12 @@ public final class CoreTests {
         m.resetPosition();
         assert !m.advance(1.5);
         assert m.advance(0.1);
+        m.setDuration(0, 3);
+        m.setDuration(1, 5);
+        m.captureMultiplicativeBase();
+        m.adjustMultiplicative(0.1);
+        assert Math.abs(m.durations()[0] - 3.3) < 1e-9;
+        assert Math.abs(m.durations()[1] - 5.5) < 1e-9;
 
         String csv = "# AquaRitm vector\n# Comments may precede the header\n"
                 + "duration_seconds,frequency_hz,transition_seconds\n10,10,2\n5,6,0\n";
