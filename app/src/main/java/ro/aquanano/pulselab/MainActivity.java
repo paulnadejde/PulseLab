@@ -325,7 +325,7 @@ public final class MainActivity extends Activity {
     private void buildMetronome() {
         title("Secvențe temporale");
         MetronomeLogic logic = audioService.engine().metronome();
-        int[] durations = logic.durations();
+        double[] durations = logic.durations();
         boolean[] enabled = logic.enabled();
         sequenceValues = new EditText[4];
         sequenceEnabled = new CheckBox[4];
@@ -336,7 +336,7 @@ public final class MainActivity extends Activity {
             check.setText("Secvența " + (i + 1));
             check.setTextColor(Color.WHITE);
             check.setChecked(enabled[i]);
-            EditText value = number(String.valueOf(durations[i]));
+            EditText value = decimal(formatSeconds(durations[i]));
             sequenceEnabled[i] = check;
             sequenceValues[i] = value;
             row.addView(check, new LinearLayout.LayoutParams(0, dp(54), 2));
@@ -364,7 +364,12 @@ public final class MainActivity extends Activity {
         content.addView(adjust);
         adjustmentMode.setOnItemSelectedListener(new SimpleItemSelected() {
             @Override public void selected(int position) {
-                if (position == 1) logic.captureMultiplicativeBase();
+                if (position == 1) {
+                    logic.captureMultiplicativeBase();
+                    adjustmentValue.setText("0.1");
+                } else {
+                    adjustmentValue.setText("1");
+                }
             }
         });
         minus.setOnClickListener(v -> adjustMetronome(-1));
@@ -1296,29 +1301,42 @@ public final class MainActivity extends Activity {
 
     private void adjustMetronome(int sign) {
         syncMetronomeToEngine();
-        double amount = parseDouble(adjustmentValue, adjustmentMode.getSelectedItemPosition() == 0 ? 1 : 0.1);
-        if (adjustmentMode.getSelectedItemPosition() == 0)
-            audioService.engine().metronome().adjustAdditive(sign * (int) Math.round(amount));
-        else
+        boolean multiplicative = adjustmentMode.getSelectedItemPosition() == 1;
+        double amount = parseDouble(adjustmentValue, multiplicative ? 0.1 : 1.0);
+        if (multiplicative) {
+            amount = Math.max(0.1, Math.min(2.0, Math.round(amount * 10.0) / 10.0));
+            adjustmentValue.setText(String.format(Locale.US, "%.1f", amount));
             audioService.engine().metronome().adjustMultiplicative(sign * amount);
+        } else {
+            int seconds = Math.max(1, Math.min(10, (int) Math.round(amount)));
+            adjustmentValue.setText(Integer.toString(seconds));
+            audioService.engine().metronome().adjustAdditive(sign * seconds);
+        }
         syncMetronomeFields();
     }
 
     private void syncMetronomeToEngine() {
         MetronomeLogic m = audioService.engine().metronome();
         for (int i = 0; i < 4; i++) {
-            m.setDuration(i, Math.max(1, (int) parseDouble(sequenceValues[i], 1)));
+            m.setDuration(i, Math.max(0.1, parseDouble(sequenceValues[i], 1)));
             m.setEnabled(i, sequenceEnabled[i].isChecked());
         }
     }
 
     private void syncMetronomeFields() {
-        int[] d = audioService.engine().metronome().durations();
+        double[] d = audioService.engine().metronome().durations();
         boolean[] e = audioService.engine().metronome().enabled();
         for (int i = 0; i < 4; i++) {
-            sequenceValues[i].setText(String.valueOf(d[i]));
+            sequenceValues[i].setText(formatSeconds(d[i]));
             sequenceEnabled[i].setChecked(e[i]);
         }
+    }
+
+    private String formatSeconds(double seconds) {
+        double shown = Math.round(seconds * 10.0) / 10.0;
+        if (Math.abs(shown - Math.rint(shown)) < 1e-9)
+            return Long.toString(Math.round(shown));
+        return String.format(Locale.US, "%.1f", shown);
     }
 
     private void setMetroVolumes() {
@@ -1354,7 +1372,7 @@ public final class MainActivity extends Activity {
             JSONArray d = o.getJSONArray("durations");
             JSONArray en = o.getJSONArray("enabled");
             for (int i = 0; i < 4; i++) {
-                audioService.engine().metronome().setDuration(i, d.getInt(i));
+                audioService.engine().metronome().setDuration(i, d.getDouble(i));
                 audioService.engine().metronome().setEnabled(i, en.getBoolean(i));
             }
             clickVolume.setProgress(o.optInt("click", 35));

@@ -9,18 +9,24 @@ public final class CoreTests {
     public static void main(String[] args) throws Exception {
         MetronomeLogic m = new MetronomeLogic();
         m.setDuration(0, 3);
-        assert !m.tick();
-        assert !m.tick();
-        assert m.tick();
+        assert !m.advance(1);
+        assert !m.advance(1);
+        assert m.advance(1);
         m.setEnabled(1, true);
         m.setDuration(1, 4);
         m.captureMultiplicativeBase();
-        m.adjustMultiplicative(0.5);
-        assert m.durations()[0] == 5;
-        assert m.durations()[1] == 6;
+        m.adjustMultiplicative(0.1);
+        assert Math.abs(m.durations()[0] - 3.3) < 1e-9;
+        assert Math.abs(m.durations()[1] - 4.4) < 1e-9;
+        m.adjustMultiplicative(0.1);
+        assert Math.abs(m.durations()[0] - 3.6) < 1e-9;
+        assert Math.abs(m.durations()[1] - 4.8) < 1e-9;
         m.adjustAdditive(-2);
-        assert m.durations()[0] == 3;
-        assert m.durations()[1] == 4;
+        assert Math.abs(m.durations()[0] - 1.6) < 1e-9;
+        assert Math.abs(m.durations()[1] - 2.8) < 1e-9;
+        m.resetPosition();
+        assert !m.advance(1.5);
+        assert m.advance(0.1);
 
         String csv = "# AquaRitm vector\n# Comments may precede the header\n"
                 + "duration_seconds,frequency_hz,transition_seconds\n10,10,2\n5,6,0\n";

@@ -230,6 +230,9 @@ public final class AudioEngine {
 
     private void render(short[] pcm) {
         boolean renderGenerator = generatorActive && !generatorPaused;
+        boolean sequenceEnded = metronomeRunning
+            && metronome.advance(FRAMES / (double) SAMPLE_RATE);
+        if (sequenceEnded) bellSamples = SAMPLE_RATE / 7;
         double bufferDelta = beatHz;
         double bufferCarrier = carrierHz;
         if (renderGenerator) {
@@ -306,7 +309,6 @@ public final class AudioEngine {
             if (metronomeRunning) {
                 if (samplesToSecond-- <= 0) {
                     clickSamples = SAMPLE_RATE / 45;
-                    if (metronome.tick()) bellSamples = SAMPLE_RATE / 7;
                     samplesToSecond = SAMPLE_RATE - 1;
                 }
                 if (clickSamples > 0) {

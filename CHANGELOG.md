@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.23
+
+- limitează reglajul aditiv la 1…10 secunde, în pași întregi;
+- permite reglaj multiplicativ fracționar între 0,1× și 2,0×, în pași de 0,1×;
+- păstrează intern duratele proporționale fără rotunjire la secunde întregi și le afișează la o zecimală;
+- crește rezoluția tranzițiilor metronomului de la o secundă la aproximativ 8 ms.
+
+
 ## 0.1.22
 
 - fixează ovalul indigo al ideogramelor SolaRitm în orientare verticală, inclusiv în notificarea agentului;
