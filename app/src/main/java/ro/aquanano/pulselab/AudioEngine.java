@@ -34,6 +34,7 @@ public final class AudioEngine {
     private double scheduledBeatInterval = 1.0;
     private int clickSamples;
     private int bellSamples;
+    private boolean bellOnNextBeat;
 
     private volatile boolean generatorActive;
     private volatile boolean generatorPaused;
@@ -130,6 +131,7 @@ public final class AudioEngine {
         metronome.resetPosition();
         scheduledBeatInterval = metronome.beatIntervalSeconds();
         samplesToBeat = SAMPLE_RATE * scheduledBeatInterval;
+        bellOnNextBeat = false;
         metroStartMs = SystemClock.elapsedRealtime();
         metronomeRunning = true;
     }
@@ -137,6 +139,7 @@ public final class AudioEngine {
     public synchronized void pauseMetronome() {
         if (metronomeRunning) metroAccumulatedMs += SystemClock.elapsedRealtime() - metroStartMs;
         metronomeRunning = false;
+        bellOnNextBeat = false;
         metronome.resetPosition();
     }
 
@@ -241,7 +244,7 @@ public final class AudioEngine {
         }
         boolean sequenceEnded = metronomeRunning
             && metronome.advance(FRAMES / (double) SAMPLE_RATE);
-        if (sequenceEnded) bellSamples = SAMPLE_RATE / 7;
+        if (sequenceEnded) bellOnNextBeat = true;
         double bufferDelta = beatHz;
         double bufferCarrier = carrierHz;
         if (renderGenerator) {
@@ -317,7 +320,13 @@ public final class AudioEngine {
 
             if (metronomeRunning) {
                 if (samplesToBeat-- <= 0) {
-                    clickSamples = SAMPLE_RATE / 45;
+                    if (bellOnNextBeat) {
+                        clickSamples = 0;
+                        bellSamples = SAMPLE_RATE / 7;
+                        bellOnNextBeat = false;
+                    } else {
+                        clickSamples = SAMPLE_RATE / 45;
+                    }
                     scheduledBeatInterval = metronome.beatIntervalSeconds();
                     samplesToBeat = Math.max(1.0, SAMPLE_RATE * scheduledBeatInterval) - 1.0;
                 }

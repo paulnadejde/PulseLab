@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.26
+
+- sincronizează finalul fiecărei secvențe cu grila reală a bătăilor metronomului;
+- înlocuiește permanent ultimul click al secvenței cu clopoțelul, fără suprapunere;
+- elimină asincronia audibilă a clopoțelului la intervalele multiplicative fracționare.
+
+
 ## 0.1.25
 
 - redefinește modul multiplicativ ca modificare a intervalului comun dintre bătăi, păstrând bazele etapelor neschimbate;
