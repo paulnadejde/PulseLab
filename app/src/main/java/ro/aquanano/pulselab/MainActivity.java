@@ -23,8 +23,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.provider.OpenableColumns;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -93,10 +91,12 @@ public final class MainActivity extends Activity {
     private TextView generatorTimer;
     private EditText[] sequenceValues;
     private CheckBox[] sequenceEnabled;
+    private TextView[] sequenceUnits;
     private Spinner adjustmentMode;
     private EditText adjustmentValue;
-    private boolean multiplicativeBaseDirty = true;
-    private boolean syncingMetronomeFields;
+    private TextView metronomeBeatInterval;
+    private TextView metronomeEffectiveDurations;
+    private Button metroStartPause;
     private SeekBar clickVolume;
     private SeekBar bellVolume;
     private Spinner presetSlot;
@@ -333,6 +333,7 @@ public final class MainActivity extends Activity {
         boolean[] enabled = logic.enabled();
         sequenceValues = new EditText[4];
         sequenceEnabled = new CheckBox[4];
+        sequenceUnits = new TextView[4];
         for (int i = 0; i < 4; i++) {
             final int index = i;
             LinearLayout row = horizontal();
@@ -343,16 +344,10 @@ public final class MainActivity extends Activity {
             EditText value = decimal(formatSeconds(durations[i]));
             sequenceEnabled[i] = check;
             sequenceValues[i] = value;
-            value.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) { }
-                @Override public void afterTextChanged(Editable editable) {
-                    if (!syncingMetronomeFields) multiplicativeBaseDirty = true;
-                }
-            });
             row.addView(check, new LinearLayout.LayoutParams(0, dp(54), 2));
             row.addView(value, new LinearLayout.LayoutParams(0, dp(54), 1));
             TextView unit = text(" sec", 15);
+            sequenceUnits[i] = unit;
             row.addView(unit);
             content.addView(row);
             check.setOnCheckedChangeListener((b, checked) -> {
@@ -364,7 +359,8 @@ public final class MainActivity extends Activity {
 
         title("Reglaj simultan manual");
         adjustmentMode = spinner(new String[]{"Aditiv (secunde)", "Multiplicativ (bază × increment)"});
-        adjustmentValue = decimal("1");
+        adjustmentMode.setSelection(logic.isMultiplicativeMode() ? 1 : 0);
+        adjustmentValue = decimal(logic.isMultiplicativeMode() ? "0.1" : "1");
         content.addView(adjustmentMode);
         LinearLayout adjust = horizontal();
         Button minus = button("−");
@@ -375,50 +371,64 @@ public final class MainActivity extends Activity {
         content.addView(adjust);
         adjustmentMode.setOnItemSelectedListener(new SimpleItemSelected() {
             @Override public void selected(int position) {
-                if (position == 1) {
+                boolean multiplicative = position == 1;
+                if (multiplicative != logic.isMultiplicativeMode()) {
                     syncMetronomeToEngine();
-                    logic.captureMultiplicativeBase();
-                    multiplicativeBaseDirty = false;
-                    adjustmentValue.setText("0.1");
-                } else {
-                    adjustmentValue.setText("1");
+                    logic.setMultiplicativeMode(multiplicative);
                 }
+                adjustmentValue.setText(multiplicative ? "0.1" : "1");
+                refreshMetronomeAdjustmentInfo();
             }
         });
         minus.setOnClickListener(v -> adjustMetronome(-1));
         plus.setOnClickListener(v -> adjustMetronome(1));
 
+        metronomeBeatInterval = text("", 15);
+        metronomeBeatInterval.setTextColor(ACCENT);
+        metronomeEffectiveDurations = text("", 13);
+        metronomeEffectiveDurations.setTextColor(Color.LTGRAY);
+        content.addView(metronomeBeatInterval);
+        content.addView(metronomeEffectiveDurations);
+        refreshMetronomeAdjustmentInfo();
+
         title("Sunete");
-        clickVolume = volumeRow("Click în fiecare secundă", Math.round(audioService.engine().clickVolume() * 100));
+        clickVolume = volumeRow("Click la fiecare bătaie", Math.round(audioService.engine().clickVolume() * 100));
         bellVolume = volumeRow("Clopoțel la final de secvență", Math.round(audioService.engine().bellVolume() * 100));
 
         LinearLayout run = horizontal();
-        Button startPause = button(audioService.engine().isMetronomeRunning() ? "PAUZĂ" : "START");
+        metroStartPause = button(audioService.engine().isMetronomeRunning() ? "PAUZĂ" : "START");
         Button resetValues = button("RESET VALORI");
-        run.addView(startPause, weightedButton());
+        run.addView(metroStartPause, weightedButton());
         run.addView(resetValues, weightedButton());
         content.addView(run);
-        startPause.setOnClickListener(v -> {
+        metroStartPause.setOnClickListener(v -> {
             syncMetronomeToEngine();
-            ensureMultiplicativeBase();
             setMetroVolumes();
             if (audioService.engine().isMetronomeRunning()) {
                 audioService.engine().pauseMetronome();
                 audioService.leaveForegroundIfIdle();
             } else {
+                logic.lockMode();
                 audioService.enterForeground();
                 audioService.engine().startMetronome();
             }
-            startPause.setText(audioService.engine().isMetronomeRunning() ? "PAUZĂ" : "START");
+            metroStartPause.setText(audioService.engine().isMetronomeRunning() ? "PAUZĂ" : "START");
+            applyMetronomeModeLock();
         });
         resetValues.setOnClickListener(v -> new AlertDialog.Builder(this)
             .setTitle("Resetare metronom")
-            .setMessage("Toate cele patru secvențe vor deveni 1 secundă, inclusiv cele inactive.")
+            .setMessage("Toate cele patru valori de bază vor deveni 1, inclusiv cele inactive.")
             .setNegativeButton("Renunță", null)
             .setPositiveButton("Resetează", (d, w) -> {
+                if (audioService.engine().isMetronomeRunning()) {
+                    audioService.engine().pauseMetronome();
+                    audioService.leaveForegroundIfIdle();
+                }
                 logic.resetValues();
-                multiplicativeBaseDirty = true;
                 syncMetronomeFields();
+                if (metroStartPause != null) metroStartPause.setText("START");
+                applyMetronomeModeLock();
+                refreshMetronomeAdjustmentInfo();
             }).show());
 
         metroTimer = text("Sesiune: 00:00:00", 20);
@@ -451,6 +461,8 @@ public final class MainActivity extends Activity {
         content.addView(presets);
         save.setOnClickListener(v -> saveMetroPreset());
         load.setOnClickListener(v -> loadMetroPreset());
+
+        applyMetronomeModeLock();
 
         boolean forceScreenOff = prefs().getBoolean("energy_screen_off", false);
         CheckBox keep = check("Menține ecranul aprins", keepMetro && !forceScreenOff);
@@ -1317,7 +1329,6 @@ public final class MainActivity extends Activity {
     private void adjustMetronome(int sign) {
         syncMetronomeToEngine();
         boolean multiplicative = adjustmentMode.getSelectedItemPosition() == 1;
-        ensureMultiplicativeBase();
         double amount = parseDouble(adjustmentValue, multiplicative ? 0.1 : 1.0);
         if (multiplicative) {
             amount = Math.max(0.1, Math.min(2.0, Math.round(amount * 10.0) / 10.0));
@@ -1329,14 +1340,47 @@ public final class MainActivity extends Activity {
             audioService.engine().metronome().adjustAdditive(sign * seconds);
         }
         syncMetronomeFields();
+        refreshMetronomeAdjustmentInfo();
     }
 
-    private void ensureMultiplicativeBase() {
-        if (adjustmentMode != null && adjustmentMode.getSelectedItemPosition() == 1
-                && multiplicativeBaseDirty) {
-            audioService.engine().metronome().captureMultiplicativeBase();
-            multiplicativeBaseDirty = false;
+    private void applyMetronomeModeLock() {
+        MetronomeLogic logic = audioService.engine().metronome();
+        boolean editable = !logic.isModeLocked();
+        if (adjustmentMode != null) {
+            adjustmentMode.setEnabled(editable);
+            adjustmentMode.setAlpha(editable ? 1f : .55f);
         }
+        if (sequenceValues != null) {
+            for (int i = 0; i < sequenceValues.length; i++) {
+                sequenceValues[i].setEnabled(editable);
+                sequenceValues[i].setAlpha(editable ? 1f : .65f);
+                sequenceEnabled[i].setEnabled(editable);
+                sequenceEnabled[i].setAlpha(editable ? 1f : .65f);
+            }
+        }
+    }
+
+    private void refreshMetronomeAdjustmentInfo() {
+        if (metronomeBeatInterval == null || metronomeEffectiveDurations == null) return;
+        MetronomeLogic logic = audioService.engine().metronome();
+        boolean multiplicative = logic.isMultiplicativeMode();
+        metronomeBeatInterval.setVisibility(multiplicative ? View.VISIBLE : View.GONE);
+        metronomeEffectiveDurations.setVisibility(multiplicative ? View.VISIBLE : View.GONE);
+        if (sequenceUnits != null) {
+            for (TextView unit : sequenceUnits)
+                unit.setText(multiplicative ? " bătăi" : " sec");
+        }
+        if (!multiplicative) return;
+        double beat = logic.beatIntervalSeconds();
+        metronomeBeatInterval.setText("Interval bătaie: " + formatSeconds(beat) + " s");
+        double[] base = logic.durations();
+        StringBuilder effective = new StringBuilder("Durate efective: ");
+        for (int i = 0; i < base.length; i++) {
+            if (i > 0) effective.append(" / ");
+            effective.append(formatSeconds(base[i] * beat));
+        }
+        effective.append(" s");
+        metronomeEffectiveDurations.setText(effective.toString());
     }
 
     private void syncMetronomeToEngine() {
@@ -1350,14 +1394,9 @@ public final class MainActivity extends Activity {
     private void syncMetronomeFields() {
         double[] d = audioService.engine().metronome().durations();
         boolean[] e = audioService.engine().metronome().enabled();
-        syncingMetronomeFields = true;
-        try {
-            for (int i = 0; i < 4; i++) {
-                sequenceValues[i].setText(formatSeconds(d[i]));
-                sequenceEnabled[i].setChecked(e[i]);
-            }
-        } finally {
-            syncingMetronomeFields = false;
+        for (int i = 0; i < 4; i++) {
+            sequenceValues[i].setText(formatSeconds(d[i]));
+            sequenceEnabled[i].setChecked(e[i]);
         }
     }
 
@@ -1381,6 +1420,8 @@ public final class MainActivity extends Activity {
             o.put("enabled", new JSONArray(audioService.engine().metronome().enabled()));
             o.put("click", clickVolume.getProgress());
             o.put("bell", bellVolume.getProgress());
+            o.put("multiplicative_mode", audioService.engine().metronome().isMultiplicativeMode());
+            o.put("beat_interval_seconds", audioService.engine().metronome().beatIntervalSeconds());
             String name = presetName.getText().toString().trim();
             if (name.isEmpty()) name = "Preset " + (presetSlot.getSelectedItemPosition() + 1);
             o.put("name", name);
@@ -1398,16 +1439,31 @@ public final class MainActivity extends Activity {
             String raw = prefs().getString("metro_" + presetSlot.getSelectedItemPosition(), null);
             if (raw == null) { toast("Slotul este gol"); return; }
             JSONObject o = new JSONObject(raw);
+            MetronomeLogic logic = audioService.engine().metronome();
+            if (audioService.engine().isMetronomeRunning()) {
+                audioService.engine().pauseMetronome();
+                audioService.leaveForegroundIfIdle();
+            }
+            logic.unlockMode();
+            logic.setMultiplicativeMode(o.optBoolean("multiplicative_mode",
+                logic.isMultiplicativeMode()));
+            logic.setBeatIntervalSeconds(o.optDouble("beat_interval_seconds", 1.0));
             JSONArray d = o.getJSONArray("durations");
             JSONArray en = o.getJSONArray("enabled");
             for (int i = 0; i < 4; i++) {
-                audioService.engine().metronome().setDuration(i, d.getDouble(i));
-                audioService.engine().metronome().setEnabled(i, en.getBoolean(i));
+                logic.setDuration(i, d.getDouble(i));
+                logic.setEnabled(i, en.getBoolean(i));
             }
-            multiplicativeBaseDirty = true;
             clickVolume.setProgress(o.optInt("click", 35));
             bellVolume.setProgress(o.optInt("bell", 35));
             syncMetronomeFields();
+            if (adjustmentMode != null)
+                adjustmentMode.setSelection(logic.isMultiplicativeMode() ? 1 : 0);
+            if (adjustmentValue != null)
+                adjustmentValue.setText(logic.isMultiplicativeMode() ? "0.1" : "1");
+            if (metroStartPause != null) metroStartPause.setText("START");
+            applyMetronomeModeLock();
+            refreshMetronomeAdjustmentInfo();
             setMetroVolumes();
             toast("Preset încărcat");
         } catch (Exception e) { toast("Preset invalid"); }

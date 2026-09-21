@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.25
+
+- redefinește modul multiplicativ ca modificare a intervalului comun dintre bătăi, păstrând bazele etapelor neschimbate;
+- afișează intervalul curent al bătăii și duratele efective rezultate;
+- păstrează în modul aditiv bătaia fixă la o secundă și modifică uniform valorile etapelor;
+- blochează modul, bazele și activarea etapelor după START, inclusiv în pauză;
+- deblochează configurarea numai prin RESET VALORI sau încărcarea unui preset;
+- salvează în preset modul de ritmare și intervalul multiplicativ.
+
+
 ## 0.1.24
 
 - recapturează baza multiplicativă după editarea manuală a oricărei secvențe;

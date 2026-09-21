@@ -5,16 +5,20 @@ import java.util.Arrays;
 /** Thread-safe state machine for the four sequential timers. */
 public final class MetronomeLogic {
     private final double[] durations = {1, 1, 1, 1};
-    private final double[] baseDurations = {1, 1, 1, 1};
     private final boolean[] enabled = {true, false, false, false};
     private int activeIndex;
     private double elapsedInSequence;
-    private double multiplicativeOffset;
+    private double beatIntervalSeconds = 1.0;
+    private boolean multiplicativeMode;
+    private boolean modeLocked;
 
     public synchronized double[] durations() { return durations.clone(); }
     public synchronized boolean[] enabled() { return enabled.clone(); }
     public synchronized int activeIndex() { return activeIndex; }
     public synchronized double elapsedInSequence() { return elapsedInSequence; }
+    public synchronized double beatIntervalSeconds() { return beatIntervalSeconds; }
+    public synchronized boolean isMultiplicativeMode() { return multiplicativeMode; }
+    public synchronized boolean isModeLocked() { return modeLocked; }
 
     public synchronized void setDuration(int index, double seconds) {
         durations[index] = Math.max(0.1, seconds);
@@ -25,31 +29,37 @@ public final class MetronomeLogic {
         if (!anyEnabled()) enabled[0] = true;
     }
 
-    public synchronized void captureMultiplicativeBase() {
-        System.arraycopy(durations, 0, baseDurations, 0, durations.length);
-        multiplicativeOffset = 0.0;
+    public synchronized void setMultiplicativeMode(boolean enabled) {
+        if (modeLocked || multiplicativeMode == enabled) return;
+        multiplicativeMode = enabled;
+        beatIntervalSeconds = 1.0;
+        resetPosition();
+    }
+
+    public synchronized void lockMode() { modeLocked = true; }
+    public synchronized void unlockMode() { modeLocked = false; }
+
+    public synchronized void setBeatIntervalSeconds(double seconds) {
+        if (!modeLocked && multiplicativeMode)
+            beatIntervalSeconds = Math.max(0.1, seconds);
     }
 
     public synchronized void adjustAdditive(int incrementSeconds) {
+        if (multiplicativeMode) return;
         for (int i = 0; i < durations.length; i++) {
             if (enabled[i]) durations[i] = Math.max(0.1, durations[i] + incrementSeconds);
         }
     }
 
     public synchronized void adjustMultiplicative(double signedIncrement) {
-        multiplicativeOffset += signedIncrement;
-        for (int i = 0; i < durations.length; i++) {
-            if (enabled[i]) {
-                durations[i] = Math.max(0.1,
-                    baseDurations[i] * (1.0 + multiplicativeOffset));
-            }
-        }
+        if (multiplicativeMode)
+            beatIntervalSeconds = Math.max(0.1, beatIntervalSeconds + signedIncrement);
     }
 
     public synchronized void resetValues() {
         Arrays.fill(durations, 1);
-        Arrays.fill(baseDurations, 1);
-        multiplicativeOffset = 0.0;
+        beatIntervalSeconds = 1.0;
+        modeLocked = false;
         resetPosition();
     }
 
@@ -62,9 +72,11 @@ public final class MetronomeLogic {
     public synchronized boolean advance(double seconds) {
         elapsedInSequence += Math.max(0.0, seconds);
         boolean ended = false;
-        while (elapsedInSequence >= durations[activeIndex]) {
-            elapsedInSequence -= durations[activeIndex];
+        double activeDuration = durations[activeIndex] * beatIntervalSeconds;
+        while (elapsedInSequence >= activeDuration) {
+            elapsedInSequence -= activeDuration;
             activeIndex = nextEnabled(activeIndex);
+            activeDuration = durations[activeIndex] * beatIntervalSeconds;
             ended = true;
         }
         return ended;

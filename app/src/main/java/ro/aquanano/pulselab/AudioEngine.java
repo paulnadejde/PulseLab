@@ -30,7 +30,8 @@ public final class AudioEngine {
     private volatile float bellVolume = 0.35f;
     private long metroAccumulatedMs;
     private long metroStartMs;
-    private int samplesToSecond;
+    private double samplesToBeat;
+    private double scheduledBeatInterval = 1.0;
     private int clickSamples;
     private int bellSamples;
 
@@ -127,7 +128,8 @@ public final class AudioEngine {
 
     public synchronized void startMetronome() {
         metronome.resetPosition();
-        samplesToSecond = SAMPLE_RATE;
+        scheduledBeatInterval = metronome.beatIntervalSeconds();
+        samplesToBeat = SAMPLE_RATE * scheduledBeatInterval;
         metroStartMs = SystemClock.elapsedRealtime();
         metronomeRunning = true;
     }
@@ -230,6 +232,13 @@ public final class AudioEngine {
 
     private void render(short[] pcm) {
         boolean renderGenerator = generatorActive && !generatorPaused;
+        double requestedBeatInterval = metronome.beatIntervalSeconds();
+        if (metronomeRunning && Math.abs(requestedBeatInterval - scheduledBeatInterval) > 1e-9) {
+            double oldBeatSamples = Math.max(1.0, SAMPLE_RATE * scheduledBeatInterval);
+            double remainingFraction = Math.max(0.0, Math.min(1.0, samplesToBeat / oldBeatSamples));
+            scheduledBeatInterval = requestedBeatInterval;
+            samplesToBeat = remainingFraction * SAMPLE_RATE * scheduledBeatInterval;
+        }
         boolean sequenceEnded = metronomeRunning
             && metronome.advance(FRAMES / (double) SAMPLE_RATE);
         if (sequenceEnded) bellSamples = SAMPLE_RATE / 7;
@@ -307,9 +316,10 @@ public final class AudioEngine {
             }
 
             if (metronomeRunning) {
-                if (samplesToSecond-- <= 0) {
+                if (samplesToBeat-- <= 0) {
                     clickSamples = SAMPLE_RATE / 45;
-                    samplesToSecond = SAMPLE_RATE - 1;
+                    scheduledBeatInterval = metronome.beatIntervalSeconds();
+                    samplesToBeat = Math.max(1.0, SAMPLE_RATE * scheduledBeatInterval) - 1.0;
                 }
                 if (clickSamples > 0) {
                     double age = 1.0 - clickSamples / (double) (SAMPLE_RATE / 45);
