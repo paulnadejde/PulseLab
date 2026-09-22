@@ -3,6 +3,7 @@ plugins {
 }
 
 val releaseKeystorePath = System.getenv("PULSELAB_KEYSTORE_PATH")
+val solarMasterPasswordHash = System.getenv("SOLARITM_MASTER_PASSWORD_HASH") ?: ""
 
 android {
     namespace = "ro.aquanano.pulselab"
@@ -12,8 +13,10 @@ android {
         applicationId = "ro.aquanano.pulselab"
         minSdk = 26
         targetSdk = 34
-        versionCode = 27
-        versionName = "0.1.26"
+        versionCode = 28
+        versionName = "0.1.27"
+        buildConfigField("String", "SOLARITM_MASTER_PASSWORD_HASH",
+            "\"${solarMasterPasswordHash}\"")
     }
 
     signingConfigs {
@@ -35,6 +38,10 @@ android {
             }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.27
+
+- condiționează afișarea ideogramelor SolaRitm de un acces master sau client validat;
+- adaugă în Setări SolaRitm opțiunea „Folosește parola master” și memorarea validării;
+- ascunde complet panoul ideogramelor și oprește agentul din bara de stare fără acces valid;
+- păstrează active calculele astronomice, evenimentele solare și calculul ciclurilor;
+- pregătește separat starea de acces pentru viitoarea parolă client;
+- blochează și estompează toate controalele de acces după activare;
+- injectează amprenta parolei master numai la compilare, din secretul mediului GitHub.
+
 ## 0.1.26
 
 - sincronizează finalul fiecărei secvențe cu grila reală a bătăilor metronomului;

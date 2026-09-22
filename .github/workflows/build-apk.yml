@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: PulseLab
+    env:
+      SOLARITM_MASTER_PASSWORD_HASH: ${{ secrets.SOLARITM_MASTER_PASSWORD_HASH }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -17,6 +20,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+      - name: Validate SolaRitm access secret
+        run: test -n "$SOLARITM_MASTER_PASSWORD_HASH"
       - name: Build debug APK
         run: gradle :app:assembleDebug
       - uses: actions/upload-artifact@v4

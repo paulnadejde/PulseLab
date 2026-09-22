@@ -23,6 +23,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.provider.OpenableColumns;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -735,7 +736,7 @@ public final class MainActivity extends Activity {
         content.addView(solarPhase);
         content.addView(solarNextEvent);
 
-        addSolarCyclePanel();
+        if (SolarAccess.isGranted(prefs())) addSolarCyclePanel();
 
         Button settings = button("SETĂRI SOLARITM");
         settings.setOnClickListener(v -> showSolarSettingsDialog());
@@ -821,6 +822,78 @@ public final class MainActivity extends Activity {
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(18), dp(8), dp(18), dp(8));
 
+        panel.addView(text("Acces ideograme", 16));
+        CheckBox useMasterPassword = check("Folosește parola master",
+            prefs().getBoolean(SolarAccess.PREF_USE_MASTER, false));
+        panel.addView(useMasterPassword);
+
+        EditText masterPassword = new EditText(this);
+        masterPassword.setTextColor(Color.WHITE);
+        masterPassword.setHintTextColor(Color.GRAY);
+        masterPassword.setHint("Parolă master");
+        masterPassword.setSingleLine(true);
+        masterPassword.setInputType(InputType.TYPE_CLASS_TEXT
+            | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        panel.addView(masterPassword, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        Button rememberPassword = button("MEMOREAZĂ PAROLA");
+        panel.addView(rememberPassword);
+        TextView clientAccess = text(
+            "Parola client va fi introdusă printr-o cale de activare separată.", 13);
+        clientAccess.setTextColor(Color.LTGRAY);
+        panel.addView(clientAccess);
+        TextView accessStatus = text("", 13);
+        panel.addView(accessStatus);
+
+        boolean[] accessChanged = {false};
+        Runnable refreshAccessControls = () -> {
+            boolean granted = SolarAccess.isGranted(prefs());
+            boolean useMaster = useMasterPassword.isChecked();
+            useMasterPassword.setEnabled(!granted);
+            masterPassword.setEnabled(!granted && useMaster);
+            rememberPassword.setEnabled(!granted && useMaster);
+            useMasterPassword.setAlpha(granted ? .45f : 1f);
+            masterPassword.setAlpha(granted || !useMaster ? .45f : 1f);
+            rememberPassword.setAlpha(granted || !useMaster ? .45f : 1f);
+            clientAccess.setAlpha(granted ? .45f : 1f);
+            if (granted) {
+                boolean client = prefs().getBoolean(SolarAccess.PREF_CLIENT_VALIDATED, false);
+                accessStatus.setText(client
+                    ? "Acces activat prin parola client"
+                    : "Acces activat prin parola master");
+                accessStatus.setTextColor(Color.rgb(83, 205, 112));
+            } else {
+                accessStatus.setText(useMaster
+                    ? "Introdu parola master și memoreaz-o."
+                    : "Acces inactiv");
+                accessStatus.setTextColor(Color.LTGRAY);
+            }
+        };
+        useMasterPassword.setOnCheckedChangeListener((button, checked) -> {
+            if (SolarAccess.isGranted(prefs())) return;
+            prefs().edit()
+                .putBoolean(SolarAccess.PREF_USE_MASTER, checked)
+                .putBoolean(SolarAccess.PREF_MASTER_VALIDATED, false)
+                .apply();
+            masterPassword.setText("");
+            refreshAccessControls.run();
+            SolarAgentService.sync(this);
+        });
+        rememberPassword.setOnClickListener(v -> {
+            if (SolarAccess.validateAndRememberMaster(
+                    prefs(), masterPassword.getText().toString())) {
+                accessChanged[0] = true;
+                masterPassword.setText("");
+                refreshAccessControls.run();
+                SolarAgentService.sync(this);
+                toast("Parola master a fost validată și memorată.");
+            } else {
+                accessStatus.setText("Parolă master invalidă");
+                accessStatus.setTextColor(Color.rgb(235, 92, 92));
+            }
+        });
+        refreshAccessControls.run();
+
         panel.addView(text("Sursa coordonatelor", 16));
         solarLocationMode = spinner(new String[]{"Locația telefonului", "Coordonate manuale"});
         boolean usePhone = prefs().getBoolean("solar_use_phone_location", true);
@@ -878,6 +951,7 @@ public final class MainActivity extends Activity {
             solarRefreshLocation = null;
             solarLocationStatus = null;
             solarSystemStatus = null;
+            if (accessChanged[0] && currentScreen == SCREEN_SOLARITM) renderCurrentScreen();
         });
         dialog.show();
         updateSolarDisplay();
@@ -1156,8 +1230,10 @@ public final class MainActivity extends Activity {
     }
 
     private void updateSolarGlyphs(Instant now) {
-        if (solarCycleAnchor == null || solarLargeGlyph == null || solarSmallGlyph == null) return;
+        if (solarCycleAnchor == null) return;
         SolarCycle.State state = SolarCycle.at(solarCycleAnchor, now);
+        if (!SolarAccess.isGranted(prefs())
+                || solarLargeGlyph == null || solarSmallGlyph == null) return;
         solarLargeGlyph.setValue(state.large);
         solarSmallGlyph.setValue(state.small);
     }

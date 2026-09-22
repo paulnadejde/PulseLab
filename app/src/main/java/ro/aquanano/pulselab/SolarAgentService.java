@@ -45,8 +45,9 @@ public final class SolarAgentService extends Service {
         };
 
     static void sync(Context context) {
-        boolean enabled = context.getSharedPreferences("presets", MODE_PRIVATE)
-            .getBoolean(PREF_ENABLED, false);
+        SharedPreferences preferences = context.getSharedPreferences("presets", MODE_PRIVATE);
+        boolean enabled = preferences.getBoolean(PREF_ENABLED, false)
+            && SolarAccess.isGranted(preferences);
         Intent service = new Intent(context, SolarAgentService.class);
         if (enabled) context.startForegroundService(service);
         else context.stopService(service);
@@ -56,6 +57,10 @@ public final class SolarAgentService extends Service {
         super.onCreate();
         preferences = getSharedPreferences("presets", MODE_PRIVATE);
         preferences.registerOnSharedPreferenceChangeListener(preferenceListener);
+        if (!SolarAccess.isGranted(preferences)) {
+            stopSelf();
+            return;
+        }
         NotificationManager manager = getSystemService(NotificationManager.class);
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
             "Agent SolaRitm", NotificationManager.IMPORTANCE_LOW);
@@ -70,7 +75,8 @@ public final class SolarAgentService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (!preferences.getBoolean(PREF_ENABLED, false)) {
+        if (!preferences.getBoolean(PREF_ENABLED, false)
+                || !SolarAccess.isGranted(preferences)) {
             stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf();
             return START_NOT_STICKY;
@@ -90,7 +96,8 @@ public final class SolarAgentService extends Service {
     }
 
     private void updateNotificationAndSchedule() {
-        if (!preferences.getBoolean(PREF_ENABLED, false)) {
+        if (!preferences.getBoolean(PREF_ENABLED, false)
+                || !SolarAccess.isGranted(preferences)) {
             stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf();
             return;
