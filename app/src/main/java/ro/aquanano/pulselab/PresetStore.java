@@ -23,6 +23,7 @@ import java.util.Locale;
 /** Persistent downloaded vectors and their optional audio loops. */
 public final class PresetStore {
     private static final long MAX_VECTOR_BYTES = 1_000_000;
+    private static final long MAX_FREQUENCY_BYTES = 1_000_000;
     private static final long MAX_AUDIO_BYTES = 250_000_000;
 
     public static final class LocalPreset {
@@ -52,6 +53,20 @@ public final class PresetStore {
             this.name = name;
             this.description = description;
             this.audioFile = audioFile;
+        }
+    }
+
+    public static final class LocalFrequencySet {
+        public final String id;
+        public final String name;
+        public final String description;
+        public final File frequencyFile;
+
+        LocalFrequencySet(String id, String name, String description, File frequencyFile) {
+            this.id = id;
+            this.name = name;
+            this.description = description;
+            this.frequencyFile = frequencyFile;
         }
     }
 
@@ -131,6 +146,67 @@ public final class PresetStore {
         if (id == null) return null;
         for (LocalAudio audio : listAudio(context)) if (id.equals(audio.id)) return audio;
         return null;
+    }
+
+    public static List<LocalFrequencySet> listFrequencySets(Context context) {
+        File directory = new File(root(context), "_frequencies");
+        File[] dirs = directory.listFiles(File::isDirectory);
+        if (dirs == null) return Collections.emptyList();
+        List<LocalFrequencySet> result = new ArrayList<>();
+        for (File dir : dirs) {
+            try {
+                JSONObject metadata = new JSONObject(
+                    readText(new File(dir, "metadata.json"), MAX_FREQUENCY_BYTES));
+                File frequency = new File(dir, "frequencies.csv");
+                if (!frequency.isFile()) continue;
+                result.add(new LocalFrequencySet(
+                    metadata.getString("id"), metadata.getString("name"),
+                    metadata.optString("description", ""), frequency));
+            } catch (Exception ignored) { }
+        }
+        result.sort(Comparator.comparing(item -> item.name.toLowerCase(Locale.ROOT)));
+        return result;
+    }
+
+    public static LocalFrequencySet findFrequencySet(Context context, String id) {
+        if (id == null) return null;
+        for (LocalFrequencySet item : listFrequencySets(context))
+            if (id.equals(item.id)) return item;
+        return null;
+    }
+
+    public static LocalFrequencySet saveFrequencySet(Context context, String id,
+                                                      String name, String description,
+                                                      String csv) throws Exception {
+        if (id == null || !id.matches("[A-Za-z0-9._-]{1,80}"))
+            throw new Exception("ID set de frecvențe invalid");
+        byte[] bytes = csv.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > MAX_FREQUENCY_BYTES) throw new Exception("Fișier prea mare");
+        String safeName = name == null || name.trim().isEmpty()
+            ? "Set de frecvențe" : name.trim();
+        String safeDescription = description == null ? "" : description;
+
+        File directory = new File(new File(root(context), "_frequencies"), id);
+        if (!directory.exists() && !directory.mkdirs())
+            throw new Exception("Nu pot crea directorul local");
+        File frequency = new File(directory, "frequencies.csv");
+        writeText(frequency, csv);
+
+        JSONObject metadata = new JSONObject();
+        metadata.put("id", id);
+        metadata.put("name", safeName);
+        metadata.put("description", safeDescription);
+        writeText(new File(directory, "metadata.json"), metadata.toString(2));
+        return new LocalFrequencySet(id, safeName, safeDescription, frequency);
+    }
+
+    public static LocalFrequencySet importLegacyFrequencySet(Context context,
+                                                              String name,
+                                                              String csv) throws Exception {
+        String safeName = name == null || name.trim().isEmpty()
+            ? "Set de frecvențe" : name.trim();
+        return saveFrequencySet(context, localId("local-", safeName), safeName,
+            "Migrat din versiunea anterioară", csv);
     }
 
     public static LocalAudio downloadAudio(Context context, JSONObject item, URL catalogUrl) throws Exception {
@@ -269,6 +345,10 @@ public final class PresetStore {
     }
 
     private static String localVectorId(String name) {
+        return localId("local-", name);
+    }
+
+    private static String localId(String prefix, String name) {
         String ascii = Normalizer.normalize(name, Normalizer.Form.NFD)
             .replaceAll("\\p{M}+", "");
         String safe = ascii.toLowerCase(Locale.ROOT)
@@ -276,7 +356,7 @@ public final class PresetStore {
             .replaceAll("^-+|-+$", "");
         if (safe.isEmpty()) safe = "vector";
         if (safe.length() > 60) safe = safe.substring(0, 60);
-        return "local-" + safe;
+        return prefix + safe;
     }
 
     private static String readText(File file, long maximum) throws Exception {

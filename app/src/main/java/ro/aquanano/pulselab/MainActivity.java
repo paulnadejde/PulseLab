@@ -112,8 +112,11 @@ public final class MainActivity extends Activity {
     private Button secondFrequencyButton;
     private Button thirdFrequencyButton;
     private Button frequencyPresetButton;
+    private Spinner frequencySetSelector;
+    private Button runFrequencySetButton;
     private CheckBox useFrequencyPreset;
     private TextView frequencyPresetLabel;
+    private List<PresetStore.LocalFrequencySet> localFrequencySets;
     private FrequencyPreset loadedFrequencyPreset;
     private String loadedFrequencyPresetName;
     private SeekBar generatorVolume;
@@ -262,6 +265,8 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(Color.BLACK);
         carrierDial = null;
         beatDial = null;
+        frequencySetSelector = null;
+        runFrequencySetButton = null;
         vectorMode = null;
         vectorStage = null;
         fadeInEnabled = null;
@@ -529,27 +534,47 @@ public final class MainActivity extends Activity {
         audioService.engine().setMonoComponentLevels(
             secondLevel / 100f, thirdLevel / 100f);
 
+        migrateLegacyFrequencyPreset();
         loadedFrequencyPreset = storedFrequencyPreset();
-        loadedFrequencyPresetName = prefs().getString(
-            "frequency_preset_name", "Niciun preset încărcat");
+        localFrequencySets = PresetStore.listFrequencySets(this);
 
         secondHarmonic = check("Adaugă componenta a doua", secondEnabled);
         secondFrequencyButton = button(harmonicFrequencyButtonText(2));
         thirdHarmonic = check("Adaugă componenta a treia", thirdEnabled);
         thirdFrequencyButton = button(harmonicFrequencyButtonText(3));
-        frequencyPresetButton = button("ÎNCARCĂ PRESET DE FRECVENȚE");
-        useFrequencyPreset = check("Folosește presetul de frecvențe",
+        frequencyPresetButton = button("CATALOG SETURI DE FRECVENȚE");
+        String[] frequencyLabels = localFrequencySets.isEmpty()
+            ? new String[]{"Niciun set descărcat"}
+            : localFrequencySets.stream().map(item -> item.name).toArray(String[]::new);
+        frequencySetSelector = spinner(frequencyLabels);
+        String selectedFrequencyId = prefs().getString("frequency_set_selected_id",
+            prefs().getString("frequency_set_active_id", ""));
+        if (!localFrequencySets.isEmpty()) {
+            for (int i = 0; i < localFrequencySets.size(); i++) {
+                if (localFrequencySets.get(i).id.equals(selectedFrequencyId)) {
+                    frequencySetSelector.setSelection(i);
+                    break;
+                }
+            }
+        }
+        runFrequencySetButton = button("RULEAZĂ SETUL DE FRECVENȚE SELECTAT");
+        runFrequencySetButton.setEnabled(!localFrequencySets.isEmpty());
+        runFrequencySetButton.setAlpha(localFrequencySets.isEmpty() ? 0.4f : 1f);
+        useFrequencyPreset = check("Folosește setul de frecvențe",
             loadedFrequencyPreset != null
                 && prefs().getBoolean("frequency_preset_enabled", false));
         useFrequencyPreset.setEnabled(loadedFrequencyPreset != null);
         useFrequencyPreset.setAlpha(loadedFrequencyPreset != null ? 1f : 0.4f);
-        frequencyPresetLabel = text(loadedFrequencyPresetName, 14);
+        frequencyPresetLabel = text(loadedFrequencyPreset == null
+            ? "Niciun set activ" : "Set activ: " + loadedFrequencyPresetName, 14);
         frequencyPresetLabel.setTextColor(ACCENT);
         content.addView(secondHarmonic);
         content.addView(secondFrequencyButton);
         content.addView(thirdHarmonic);
         content.addView(thirdFrequencyButton);
         content.addView(frequencyPresetButton);
+        content.addView(frequencySetSelector);
+        content.addView(runFrequencySetButton);
         content.addView(useFrequencyPreset);
         content.addView(frequencyPresetLabel);
 
@@ -567,6 +592,15 @@ public final class MainActivity extends Activity {
             startActivityForResult(
                 new Intent(this, FrequencyCatalogActivity.class),
                 PICK_FREQUENCY_PRESET));
+        frequencySetSelector.setOnItemSelectedListener(new SimpleItemSelected() {
+            @Override public void selected(int position) {
+                if (position >= 0 && position < localFrequencySets.size()) {
+                    prefs().edit().putString("frequency_set_selected_id",
+                        localFrequencySets.get(position).id).apply();
+                }
+            }
+        });
+        runFrequencySetButton.setOnClickListener(v -> activateSelectedFrequencySet());
         useFrequencyPreset.setOnCheckedChangeListener((button, checked) -> {
             prefs().edit().putBoolean("frequency_preset_enabled", checked).apply();
             if (checked && loadedFrequencyPreset != null) {
@@ -601,7 +635,7 @@ public final class MainActivity extends Activity {
         noiseType.setSelection(overlaySelection);
         content.addView(noiseType);
         overlayVolume = volumeRow("Volum semnal suprapus", Math.round(audioService.engine().noiseVolume() * 100));
-        Button chooseMusic = button("Alege piesă muzicală (buclă)");
+        Button chooseMusic = button("ALEGE PIESĂ MUZICALĂ DIN TELEFON");
         chooseMusic.setOnClickListener(v -> pickFile(PICK_MUSIC, "audio/*"));
         content.addView(chooseMusic);
         downloadedAudioFiles = PresetStore.listAudio(this);
@@ -610,7 +644,7 @@ public final class MainActivity extends Activity {
             : downloadedAudioFiles.stream().map(a -> a.name).toArray(String[]::new);
         downloadedAudio = spinner(audioLabels);
         content.addView(downloadedAudio);
-        Button loadAudio = button("ÎNCARCĂ SUNET LOCAL");
+        Button loadAudio = button("RULEAZĂ PIESA MUZICALĂ SELECTATĂ");
         loadAudio.setEnabled(!downloadedAudioFiles.isEmpty());
         loadAudio.setAlpha(downloadedAudioFiles.isEmpty() ? 0.4f : 1f);
         loadAudio.setOnClickListener(v -> {
@@ -618,7 +652,7 @@ public final class MainActivity extends Activity {
                 loadDownloadedAudio(downloadedAudioFiles.get(downloadedAudio.getSelectedItemPosition()));
         });
         content.addView(loadAudio);
-        Button musicCatalog = button("CATALOG MUZICĂ");
+        Button musicCatalog = button("CATALOG ONLINE MUZICĂ");
         musicCatalog.setOnClickListener(v -> startActivityForResult(
             new Intent(this, PresetCatalogActivity.class)
                 .putExtra(PresetCatalogActivity.EXTRA_RESOURCE_TYPE,
@@ -638,7 +672,7 @@ public final class MainActivity extends Activity {
         vectorMode = check("Folosește vector CSV", useVector);
         vectorMode.setOnCheckedChangeListener((b, checked) -> useVector = checked);
         content.addView(vectorMode);
-        Button importVector = button("ALEGE VECTOR CSV");
+        Button importVector = button("ALEGE PRESET DIN TELEFON");
         importVector.setOnClickListener(v -> pickFile(PICK_VECTOR, "text/*"));
         content.addView(importVector);
         downloadedPresets = PresetStore.list(this);
@@ -654,7 +688,7 @@ public final class MainActivity extends Activity {
                 }
             }
         }
-        Button loadLocal = button("ÎNCARCĂ PRESETUL LOCAL");
+        Button loadLocal = button("RULEAZĂ PRESETUL SELECTAT");
         loadLocal.setEnabled(!downloadedPresets.isEmpty());
         loadLocal.setAlpha(downloadedPresets.isEmpty() ? 0.4f : 1f);
         loadLocal.setOnClickListener(v -> {
@@ -662,7 +696,7 @@ public final class MainActivity extends Activity {
                 loadDownloadedPreset(downloadedPresets.get(downloadedPreset.getSelectedItemPosition()));
         });
         content.addView(loadLocal);
-        Button presetCatalog = button("CATALOG PRESETURI");
+        Button presetCatalog = button("CATALOG ONLINE PRESETURI");
         presetCatalog.setOnClickListener(v -> startActivityForResult(
             new Intent(this, PresetCatalogActivity.class)
                 .putExtra(PresetCatalogActivity.EXTRA_RESOURCE_TYPE,
@@ -1380,17 +1414,71 @@ public final class MainActivity extends Activity {
             .show();
     }
 
-    private FrequencyPreset storedFrequencyPreset() {
+    private void migrateLegacyFrequencyPreset() {
         String csv = prefs().getString("frequency_preset_csv", "");
-        if (csv.isEmpty()) return null;
+        if (csv.isEmpty()) return;
+        String name = prefs().getString("frequency_preset_name", "Set de frecvențe");
         try {
-            return FrequencyPreset.parseCsv(new StringReader(csv));
+            FrequencyPreset.parseCsv(new StringReader(csv));
+            PresetStore.LocalFrequencySet saved =
+                PresetStore.importLegacyFrequencySet(this, name, csv);
+            prefs().edit()
+                .putString("frequency_set_active_id", saved.id)
+                .putString("frequency_set_selected_id", saved.id)
+                .remove("frequency_preset_csv")
+                .remove("frequency_preset_name")
+                .apply();
         } catch (Exception invalid) {
             prefs().edit()
                 .remove("frequency_preset_csv")
+                .remove("frequency_preset_name")
+                .putBoolean("frequency_preset_enabled", false)
+                .apply();
+        }
+    }
+
+    private FrequencyPreset storedFrequencyPreset() {
+        String id = prefs().getString("frequency_set_active_id", "");
+        PresetStore.LocalFrequencySet item = PresetStore.findFrequencySet(this, id);
+        if (item == null) return null;
+        try (FileReader reader = new FileReader(item.frequencyFile)) {
+            FrequencyPreset result = FrequencyPreset.parseCsv(reader);
+            loadedFrequencyPresetName = item.name;
+            return result;
+        } catch (Exception invalid) {
+            prefs().edit()
+                .remove("frequency_set_active_id")
                 .putBoolean("frequency_preset_enabled", false)
                 .apply();
             return null;
+        }
+    }
+
+    private void activateSelectedFrequencySet() {
+        if (localFrequencySets == null || localFrequencySets.isEmpty()
+            || frequencySetSelector == null) {
+            toast("Descarcă mai întâi un set de frecvențe");
+            return;
+        }
+        int position = frequencySetSelector.getSelectedItemPosition();
+        if (position < 0 || position >= localFrequencySets.size()) return;
+        PresetStore.LocalFrequencySet item = localFrequencySets.get(position);
+        try (FileReader reader = new FileReader(item.frequencyFile)) {
+            loadedFrequencyPreset = FrequencyPreset.parseCsv(reader);
+            loadedFrequencyPresetName = item.name;
+            prefs().edit()
+                .putString("frequency_set_active_id", item.id)
+                .putString("frequency_set_selected_id", item.id)
+                .putBoolean("frequency_preset_enabled", true)
+                .apply();
+            useFrequencyPreset.setEnabled(true);
+            useFrequencyPreset.setAlpha(1f);
+            if (useFrequencyPreset.isChecked()) applyFrequencyPreset(loadedFrequencyPreset);
+            else useFrequencyPreset.setChecked(true);
+            frequencyPresetLabel.setText("Set activ: " + loadedFrequencyPresetName);
+            toast("Set pregătit pentru rulare: " + loadedFrequencyPresetName);
+        } catch (Exception invalid) {
+            toast("Set de frecvențe invalid: " + invalid.getMessage());
         }
     }
 
@@ -1424,7 +1512,7 @@ public final class MainActivity extends Activity {
             .apply();
         secondFrequencyButton.setText(harmonicFrequencyButtonText(2));
         thirdFrequencyButton.setText(harmonicFrequencyButtonText(3));
-        frequencyPresetLabel.setText(loadedFrequencyPresetName);
+        frequencyPresetLabel.setText("Set activ: " + loadedFrequencyPresetName);
     }
 
     private double preferenceDouble(String key, double fallback) {
@@ -1792,22 +1880,14 @@ public final class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == PICK_FREQUENCY_PRESET
             && resultCode == RESULT_OK && data != null) {
-            String csv = data.getStringExtra(FrequencyCatalogActivity.RESULT_CSV);
-            String name = data.getStringExtra(FrequencyCatalogActivity.RESULT_NAME);
-            try {
-                FrequencyPreset preset = FrequencyPreset.parseCsv(new StringReader(csv));
-                loadedFrequencyPreset = preset;
-                loadedFrequencyPresetName = name == null || name.trim().isEmpty()
-                    ? "Preset de frecvențe" : name.trim();
-                prefs().edit()
-                    .putString("frequency_preset_csv", csv)
-                    .putString("frequency_preset_name", loadedFrequencyPresetName)
-                    .putBoolean("frequency_preset_enabled", true)
-                    .apply();
-                toast("Preset încărcat: " + loadedFrequencyPresetName);
+            String id = data.getStringExtra(
+                FrequencyCatalogActivity.RESULT_FREQUENCY_SET_ID);
+            PresetStore.LocalFrequencySet saved =
+                PresetStore.findFrequencySet(this, id);
+            if (saved != null) {
+                prefs().edit().putString("frequency_set_selected_id", saved.id).apply();
+                toast("Set descărcat local: " + saved.name);
                 renderCurrentScreen();
-            } catch (Exception error) {
-                toast("Preset de frecvențe invalid: " + error.getMessage());
             }
             return;
         }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.31
+
+- clarifică prin denumiri distincte alegerea fișierelor din telefon, rularea selecțiilor locale și accesul la cataloagele online;
+- redenumește consecvent comenzile pentru muzică în BioStim și MindExtra;
+- redenumește comenzile presetului vectorial din MindExtra;
+- transformă catalogul seturilor de frecvențe BioStim într-un mecanism de descărcare locală, fără activare automată;
+- memorează simultan mai multe seturi de frecvențe și adaugă un selector local;
+- adaugă comanda „Rulează setul de frecvențe selectat”, care pregătește setul fără a porni generatorul;
+- redenumește opțiunea în „Folosește setul de frecvențe”;
+- migrează automat setul unic memorat de versiunile anterioare în noua bibliotecă locală.
+
 ## 0.1.30
 
 - separă accesul online din MindExtra în „Catalog muzică” și „Catalog preseturi”;

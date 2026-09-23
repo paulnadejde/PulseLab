@@ -22,8 +22,7 @@ import ro.aquanano.pulselab.core.FrequencyPreset;
 
 /** Online selector for small monoaural frequency presets. */
 public final class FrequencyCatalogActivity extends Activity {
-    public static final String RESULT_CSV = "frequency_preset_csv";
-    public static final String RESULT_NAME = "frequency_preset_name";
+    public static final String RESULT_FREQUENCY_SET_ID = "frequency_set_id";
     private static final String CATALOG =
         "https://aquanano.eu/aquaweb/aquaritm/catalog_aquaritm.php";
 
@@ -36,11 +35,11 @@ public final class FrequencyCatalogActivity extends Activity {
         page.setPadding(dp(14), dp(12), dp(14), dp(14));
         page.setBackgroundColor(Color.BLACK);
 
-        TextView title = text("Preseturi de frecvențe", 24);
+        TextView title = text("Catalog seturi de frecvențe", 24);
         title.setTextColor(Color.rgb(69, 214, 196));
         page.addView(title);
         page.addView(text(
-            "Presetul ales rămâne memorat și poate fi activat din Generator.", 15));
+            "Seturile descărcate rămân memorate local. Activarea lor se face din BioStim.", 15));
 
         ScrollView scroll = new ScrollView(this);
         list = new LinearLayout(this);
@@ -75,7 +74,7 @@ public final class FrequencyCatalogActivity extends Activity {
     private void showCatalog(JSONArray items, URL catalogUrl) {
         list.removeAllViews();
         if (items.length() == 0) {
-            list.addView(text("Niciun preset de frecvențe disponibil.", 15));
+            list.addView(text("Niciun set de frecvențe disponibil.", 15));
             return;
         }
         for (int i = 0; i < items.length(); i++) {
@@ -85,8 +84,10 @@ public final class FrequencyCatalogActivity extends Activity {
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(10), dp(8), dp(10), dp(12));
-            card.addView(text(item.optString("name", "Preset"), 18));
-            Button load = button("ÎNCARCĂ");
+            card.addView(text(item.optString("name", "Set de frecvențe"), 18));
+            boolean installed = PresetStore.findFrequencySet(
+                this, item.optString("id")) != null;
+            Button load = button(installed ? "ACTUALIZEAZĂ" : "DESCARCĂ");
             load.setOnClickListener(v -> download(item, catalogUrl, load));
             card.addView(load, UiStyle.centeredButton(this));
             list.addView(card);
@@ -105,11 +106,14 @@ public final class FrequencyCatalogActivity extends Activity {
                 if (!expected.isEmpty() && !expected.equalsIgnoreCase(sha256(csv))) {
                     throw new Exception("Checksum incorect");
                 }
-                String name = item.optString("name", "Preset de frecvențe");
+                String id = item.getString("id");
+                String name = item.optString("name", "Set de frecvențe");
+                String description = item.optString("description", "");
+                PresetStore.LocalFrequencySet saved = PresetStore.saveFrequencySet(
+                    this, id, name, description, csv);
                 runOnUiThread(() -> {
                     Intent result = new Intent();
-                    result.putExtra(RESULT_CSV, csv);
-                    result.putExtra(RESULT_NAME, name);
+                    result.putExtra(RESULT_FREQUENCY_SET_ID, saved.id);
                     setResult(RESULT_OK, result);
                     finish();
                 });
