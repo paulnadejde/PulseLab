@@ -42,6 +42,8 @@ public final class SettingsActivity extends Activity {
     private static final int RED = Color.rgb(174, 55, 62);
     private static final String UPDATE_CATALOG =
         "https://aquanano.eu/aquaweb/aquaritm/aplicatie/catalog_aplicatie.php";
+    private static final String SHARE_PAGE =
+        "https://aquanano.eu/aquaweb/aquaritm/aplicatie/aquaritm.php";
     private static final String PENDING_DOWNLOAD_ID = "update_download_id";
     private static final String PENDING_DOWNLOAD_HASH = "update_download_hash";
     private static final String PENDING_DOWNLOAD_VERSION = "update_download_version";
@@ -151,6 +153,10 @@ public final class SettingsActivity extends Activity {
             startActivity(new Intent(this, DocumentationActivity.class)));
 
         section(page, "Aplicație");
+        Button share = button("DISTRIBUIE AQUARITM", BLUE);
+        page.addView(share, fullButton());
+        share.setOnClickListener(v -> shareApplication());
+
         Button close = button("ÎNCHIDE APLICAȚIA", RED);
         page.addView(close, fullButton());
         close.setOnClickListener(v -> confirmClose());
@@ -479,6 +485,22 @@ public final class SettingsActivity extends Activity {
     private static String humanSize(long bytes) {
         if (bytes < 1024L * 1024L) return String.format(Locale.US, "%.1f KB", bytes / 1024.0);
         return String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+
+    private void shareApplication() {
+        String message = "Îți recomand AquaRitm – metronom, BioStim, MindExtra și SolaRitm."
+            + "\n\nDescarcă aplicația de aici:\n" + SHARE_PAGE;
+        Intent share = new Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_SUBJECT, "AquaRitm")
+            .putExtra(Intent.EXTRA_TEXT, message);
+        try {
+            startActivity(Intent.createChooser(share, "Distribuie AquaRitm prin"));
+        } catch (RuntimeException unavailable) {
+            Toast.makeText(this,
+                "Nu există nicio aplicație disponibilă pentru distribuire.",
+                Toast.LENGTH_LONG).show();
+        }
     }
 
     private void confirmClose() {

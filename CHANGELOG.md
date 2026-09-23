@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.28
+
+- adaugă în Setări comanda „Distribuie AquaRitm”;
+- deschide selectorul standard Android pentru trimiterea paginii publice prin aplicația aleasă de utilizator;
+- adaugă pagina publică `aquaritm.php`, care citește dinamic ultima versiune din catalogul aplicației.
+
 ## 0.1.27
 
 - condiționează afișarea ideogramelor SolaRitm de un acces master sau client validat;
