@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.29
+
+- adaugă în MindExtra o creștere opțională a volumului la începutul sesiunii;
+- adaugă o scădere opțională a volumului în ultimele minute ale sesiunii;
+- memorează separat procentele și duratele celor două variații;
+- interpolează lin volumul între cele două rampe când valorile lor intermediare diferă;
+- aplică anvelopa numai generatorului binaural, fără a modifica semnalul suprapus;
+- validează procentele, durata finită necesară rampei finale și suprapunerea rampelor;
+- păstrează poziția anvelopei în pauză și o reia odată cu sesiunea.
+
 ## 0.1.28
 
 - adaugă în Setări comanda „Distribuie AquaRitm”;

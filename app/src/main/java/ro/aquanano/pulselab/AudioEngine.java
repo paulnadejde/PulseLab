@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import ro.aquanano.pulselab.core.HarmonicMixer;
 import ro.aquanano.pulselab.core.MetronomeLogic;
 import ro.aquanano.pulselab.core.VectorProgram;
+import ro.aquanano.pulselab.core.VolumeEnvelope;
 
 /** One PCM mixer for the oscillator, noise and metronome. */
 public final class AudioEngine {
@@ -53,6 +54,7 @@ public final class AudioEngine {
     private volatile Noise noise = Noise.NONE;
     private volatile float noiseVolume = 0.08f;
     private volatile VectorProgram vector;
+    private volatile VolumeEnvelope volumeEnvelope = VolumeEnvelope.disabled();
     private volatile long sessionLimitMs;
     private long generatorAccumulatedMs;
     private long generatorStartMs;
@@ -219,6 +221,10 @@ public final class AudioEngine {
         noiseVolume = clamp01(noiseLevel);
     }
 
+    public void configureVolumeEnvelope(VolumeEnvelope envelope) {
+        volumeEnvelope = envelope == null ? VolumeEnvelope.disabled() : envelope;
+    }
+
     private void renderLoop() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
         short[] pcm = new short[FRAMES * 2];
@@ -247,8 +253,9 @@ public final class AudioEngine {
         if (sequenceEnded) bellOnNextBeat = true;
         double bufferDelta = beatHz;
         double bufferCarrier = carrierHz;
+        long bufferElapsedMs = generatorElapsedMs();
         if (renderGenerator) {
-            long elapsed = generatorElapsedMs();
+            long elapsed = bufferElapsedMs;
             if (sessionLimitMs > 0 && elapsed >= sessionLimitMs) {
                 generatorAccumulatedMs = sessionLimitMs;
                 generatorActive = false;
@@ -274,8 +281,12 @@ public final class AudioEngine {
                     double fR = Math.max(0.1, bufferCarrier + delta / 2.0);
                     phaseLeft = wrap(phaseLeft + twoPi(fL));
                     phaseRight = wrap(phaseRight + twoPi(fR));
-                    left += Math.sin(phaseLeft) * generatorVolume;
-                    right += Math.sin(phaseRight) * generatorVolume;
+                    double elapsedSeconds = bufferElapsedMs / 1000.0
+                        + frame / (double) SAMPLE_RATE;
+                    double envelopeGain = volumeEnvelope.gainAt(
+                        elapsedSeconds, sessionLimitMs / 1000.0);
+                    left += Math.sin(phaseLeft) * generatorVolume * envelopeGain;
+                    right += Math.sin(phaseRight) * generatorVolume * envelopeGain;
                 } else {
                     monoPhase = wrap(monoPhase + twoPi(bufferCarrier));
 

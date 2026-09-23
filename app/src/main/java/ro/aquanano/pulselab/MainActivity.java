@@ -23,7 +23,9 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.provider.OpenableColumns;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -65,6 +67,7 @@ import ro.aquanano.pulselab.core.MetronomeLogic;
 import ro.aquanano.pulselab.core.SolarCalculator;
 import ro.aquanano.pulselab.core.SolarCycle;
 import ro.aquanano.pulselab.core.VectorProgram;
+import ro.aquanano.pulselab.core.VolumeEnvelope;
 
 public final class MainActivity extends Activity {
     private static final int SCREEN_METRONOME = 0;
@@ -114,6 +117,16 @@ public final class MainActivity extends Activity {
     private FrequencyPreset loadedFrequencyPreset;
     private String loadedFrequencyPresetName;
     private SeekBar generatorVolume;
+    private CheckBox fadeInEnabled;
+    private EditText fadeInFrom;
+    private EditText fadeInTo;
+    private EditText fadeInMinutes;
+    private LinearLayout fadeInControls;
+    private CheckBox fadeOutEnabled;
+    private EditText fadeOutFrom;
+    private EditText fadeOutTo;
+    private EditText fadeOutMinutes;
+    private LinearLayout fadeOutControls;
     private SeekBar overlayVolume;
     private Spinner noiseType;
     private EditText sessionMinutes;
@@ -251,6 +264,16 @@ public final class MainActivity extends Activity {
         beatDial = null;
         vectorMode = null;
         vectorStage = null;
+        fadeInEnabled = null;
+        fadeInFrom = null;
+        fadeInTo = null;
+        fadeInMinutes = null;
+        fadeInControls = null;
+        fadeOutEnabled = null;
+        fadeOutFrom = null;
+        fadeOutTo = null;
+        fadeOutMinutes = null;
+        fadeOutControls = null;
         strobe = null;
         generatorTimer = null;
         solarLocationMode = null;
@@ -570,6 +593,7 @@ public final class MainActivity extends Activity {
         }
 
         generatorVolume = volumeRow("Volum generator", Math.round(audioService.engine().generatorVolume() * 100));
+        if (!bioStim) buildMindExtraVolumeEnvelope();
         title("Semnal suprapus");
         noiseType = spinner(new String[]{"Fără suprapunere", "Zgomot alb", "Zgomot roz", "Zgomot brun", "Piesă muzicală"});
         int overlaySelection = audioService.engine().noise().ordinal();
@@ -1573,12 +1597,17 @@ public final class MainActivity extends Activity {
             toast("Încarcă mai întâi un vector CSV");
             return false;
         }
+        long limit = Math.round(parseDouble(sessionMinutes, 20) * 60_000);
+        double totalSeconds = p != null ? p.totalSeconds() : Math.max(0, limit) / 1000.0;
+        VolumeEnvelope envelope = bioStim
+            ? VolumeEnvelope.disabled() : validatedMindExtraEnvelope(totalSeconds);
+        if (envelope == null) return false;
         boolean second = bioStim && secondHarmonic.isChecked();
         boolean third = bioStim && thirdHarmonic.isChecked();
         audioService.engine().configureGenerator(!bioStim,
             carrier, beat, second, third,
             generatorVolume.getProgress() / 100f, n, overlayVolume.getProgress() / 100f);
-        long limit = Math.round(parseDouble(sessionMinutes, 20) * 60_000);
+        audioService.engine().configureVolumeEnvelope(envelope);
         SharedPreferences.Editor settings = prefs().edit()
             .putString(bioStim ? "biostim_carrier_hz" : "mindextra_carrier_hz",
                 Double.toString(carrier))
@@ -1586,6 +1615,7 @@ public final class MainActivity extends Activity {
                 sessionMinutes.getText().toString());
         if (!bioStim) settings.putString("mindextra_beat_hz", Double.toString(beat));
         settings.apply();
+        if (!bioStim) persistMindExtraEnvelope();
         audioService.enterForeground();
         audioService.engine().startGenerator(limit, p);
         audioService.setMusicVolume(overlayVolume.getProgress() / 100f);
@@ -1593,6 +1623,140 @@ public final class MainActivity extends Activity {
         else audioService.stopMusic();
         generatorWasActive = true;
         return true;
+    }
+
+    private void buildMindExtraVolumeEnvelope() {
+        title("Variația volumului");
+        TextView note = text(
+            "Procentele sunt relative la Volum generator. Opțiunile nu modifică zgomotul sau piesa suprapusă.",
+            13);
+        note.setTextColor(Color.LTGRAY);
+        content.addView(note);
+
+        fadeInEnabled = check("Crește volumul la început",
+            prefs().getBoolean("mindextra_fade_in_enabled", false));
+        fadeInFrom = number(prefs().getString("mindextra_fade_in_from", "0"));
+        fadeInTo = number(prefs().getString("mindextra_fade_in_to", "100"));
+        fadeInMinutes = decimal(prefs().getString("mindextra_fade_in_minutes", "2"));
+        fadeInControls = envelopeControls(fadeInFrom, fadeInTo, fadeInMinutes, false);
+        content.addView(fadeInEnabled);
+        content.addView(fadeInControls);
+
+        fadeOutEnabled = check("Scade volumul la sfârșit",
+            prefs().getBoolean("mindextra_fade_out_enabled", false));
+        fadeOutFrom = number(prefs().getString("mindextra_fade_out_from", "100"));
+        fadeOutTo = number(prefs().getString("mindextra_fade_out_to", "0"));
+        fadeOutMinutes = decimal(prefs().getString("mindextra_fade_out_minutes", "2"));
+        fadeOutControls = envelopeControls(fadeOutFrom, fadeOutTo, fadeOutMinutes, true);
+        content.addView(fadeOutEnabled);
+        content.addView(fadeOutControls);
+
+        setEnvelopeControlsEnabled(fadeInControls, fadeInEnabled.isChecked());
+        setEnvelopeControlsEnabled(fadeOutControls, fadeOutEnabled.isChecked());
+        fadeInEnabled.setOnCheckedChangeListener((button, checked) -> {
+            setEnvelopeControlsEnabled(fadeInControls, checked);
+            persistMindExtraEnvelope();
+        });
+        fadeOutEnabled.setOnCheckedChangeListener((button, checked) -> {
+            setEnvelopeControlsEnabled(fadeOutControls, checked);
+            persistMindExtraEnvelope();
+        });
+
+        TextWatcher saver = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                persistMindExtraEnvelope();
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        };
+        fadeInFrom.addTextChangedListener(saver);
+        fadeInTo.addTextChangedListener(saver);
+        fadeInMinutes.addTextChangedListener(saver);
+        fadeOutFrom.addTextChangedListener(saver);
+        fadeOutTo.addTextChangedListener(saver);
+        fadeOutMinutes.addTextChangedListener(saver);
+    }
+
+    private LinearLayout envelopeControls(EditText from, EditText to, EditText minutes,
+                                          boolean lastMinutes) {
+        LinearLayout row = horizontal();
+        row.addView(text("De la", 14));
+        row.addView(from, weighted());
+        row.addView(text("% la", 14));
+        row.addView(to, weighted());
+        row.addView(text(lastMinutes ? "% în ultimele" : "% în", 14));
+        row.addView(minutes, weighted());
+        row.addView(text("min", 14));
+        return row;
+    }
+
+    private void setEnvelopeControlsEnabled(ViewGroup controls, boolean enabled) {
+        controls.setAlpha(enabled ? 1f : 0.45f);
+        for (int i = 0; i < controls.getChildCount(); i++) {
+            controls.getChildAt(i).setEnabled(enabled);
+        }
+    }
+
+    private void persistMindExtraEnvelope() {
+        if (fadeInEnabled == null || fadeOutEnabled == null) return;
+        prefs().edit()
+            .putBoolean("mindextra_fade_in_enabled", fadeInEnabled.isChecked())
+            .putString("mindextra_fade_in_from", fadeInFrom.getText().toString())
+            .putString("mindextra_fade_in_to", fadeInTo.getText().toString())
+            .putString("mindextra_fade_in_minutes", fadeInMinutes.getText().toString())
+            .putBoolean("mindextra_fade_out_enabled", fadeOutEnabled.isChecked())
+            .putString("mindextra_fade_out_from", fadeOutFrom.getText().toString())
+            .putString("mindextra_fade_out_to", fadeOutTo.getText().toString())
+            .putString("mindextra_fade_out_minutes", fadeOutMinutes.getText().toString())
+            .apply();
+    }
+
+    private VolumeEnvelope validatedMindExtraEnvelope(double totalSeconds) {
+        boolean fadeIn = fadeInEnabled != null && fadeInEnabled.isChecked();
+        boolean fadeOut = fadeOutEnabled != null && fadeOutEnabled.isChecked();
+        if (!fadeIn && !fadeOut) return VolumeEnvelope.disabled();
+
+        double inFrom = parseDouble(fadeInFrom, Double.NaN);
+        double inTo = parseDouble(fadeInTo, Double.NaN);
+        double inSeconds = parseDouble(fadeInMinutes, Double.NaN) * 60.0;
+        double outFrom = parseDouble(fadeOutFrom, Double.NaN);
+        double outTo = parseDouble(fadeOutTo, Double.NaN);
+        double outSeconds = parseDouble(fadeOutMinutes, Double.NaN) * 60.0;
+
+        if ((fadeIn && (!validPercent(inFrom) || !validPercent(inTo)))
+            || (fadeOut && (!validPercent(outFrom) || !validPercent(outTo)))) {
+            toast("Valorile volumului trebuie să fie între 0 și 100%");
+            return null;
+        }
+        if (fadeIn && inFrom > inTo) {
+            toast("La început, volumul final trebuie să fie cel puțin egal cu cel inițial");
+            return null;
+        }
+        if (fadeOut && outFrom < outTo) {
+            toast("La sfârșit, volumul final trebuie să fie cel mult egal cu cel inițial");
+            return null;
+        }
+        if ((fadeIn && (!Double.isFinite(inSeconds) || inSeconds <= 0.0))
+            || (fadeOut && (!Double.isFinite(outSeconds) || outSeconds <= 0.0))) {
+            toast("Durata fiecărei variații active trebuie să fie mai mare decât zero");
+            return null;
+        }
+        if (fadeOut && totalSeconds <= 0.0) {
+            toast("Scăderea din ultimele minute necesită o durată totală a sesiunii");
+            return null;
+        }
+        double rampsSeconds = (fadeIn ? inSeconds : 0.0) + (fadeOut ? outSeconds : 0.0);
+        if (totalSeconds > 0.0 && rampsSeconds > totalSeconds + 1e-9) {
+            toast("Durata variațiilor depășește durata totală a sesiunii");
+            return null;
+        }
+        return new VolumeEnvelope(
+            fadeIn, inFrom / 100.0, inTo / 100.0, inSeconds,
+            fadeOut, outFrom / 100.0, outTo / 100.0, outSeconds);
+    }
+
+    private static boolean validPercent(double value) {
+        return Double.isFinite(value) && value >= 0.0 && value <= 100.0;
     }
 
     private boolean generatorMatchesScreen(AudioEngine engine, boolean bioStim) {
