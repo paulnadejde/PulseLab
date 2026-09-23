@@ -19,22 +19,33 @@ import java.net.URL;
 public final class PresetCatalogActivity extends Activity {
     public static final String RESULT_PRESET_ID = "downloaded_preset_id";
     public static final String RESULT_RESOURCE_TYPE = "downloaded_resource_type";
+    public static final String EXTRA_RESOURCE_TYPE = "catalog_resource_type";
     public static final String TYPE_VECTOR = "vector";
     public static final String TYPE_AUDIO = "audio";
     private static final String CATALOG =
         "https://aquanano.eu/aquaweb/aquaritm/catalog_aquaritm.php";
     private LinearLayout list;
+    private String resourceType;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        resourceType = getIntent().getStringExtra(EXTRA_RESOURCE_TYPE);
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(14), dp(12), dp(14), dp(14));
         page.setBackgroundColor(Color.BLACK);
-        TextView title = text("Biblioteca AquaRitm", 24);
+        String titleValue = TYPE_AUDIO.equals(resourceType)
+            ? "Catalog muzică" : TYPE_VECTOR.equals(resourceType)
+                ? "Catalog preseturi" : "Biblioteca AquaRitm";
+        String noteValue = TYPE_AUDIO.equals(resourceType)
+            ? "Piesele se descarcă și rămân disponibile offline."
+            : TYPE_VECTOR.equals(resourceType)
+                ? "Preseturile vectoriale se descarcă și rămân disponibile offline."
+                : "Vectorii și sunetele se descarcă separat și rămân disponibile offline.";
+        TextView title = text(titleValue, 24);
         title.setTextColor(Color.rgb(69, 214, 196));
         page.addView(title);
-        page.addView(text("Vectorii și sunetele se descarcă separat și rămân disponibile offline.", 15));
+        page.addView(text(noteValue, 15));
         ScrollView scroll = new ScrollView(this);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
@@ -68,8 +79,10 @@ public final class PresetCatalogActivity extends Activity {
 
     private void showCatalog(JSONArray vectors, JSONArray audio, URL catalogUrl) {
         list.removeAllViews();
-        addSection("VECTORI", vectors, TYPE_VECTOR, catalogUrl);
-        addSection("SUNETE", audio, TYPE_AUDIO, catalogUrl);
+        if (!TYPE_AUDIO.equals(resourceType))
+            addSection("VECTORI", vectors, TYPE_VECTOR, catalogUrl);
+        if (!TYPE_VECTOR.equals(resourceType))
+            addSection("SUNETE", audio, TYPE_AUDIO, catalogUrl);
     }
 
     private void addSection(String title, JSONArray items, String type, URL catalogUrl) {

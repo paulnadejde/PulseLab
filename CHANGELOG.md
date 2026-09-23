@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.30
+
+- separă accesul online din MindExtra în „Catalog muzică” și „Catalog preseturi”;
+- filtrează biblioteca online după categoria cerută, păstrând același catalog PHP;
+- redenumește „Importă vector CSV” în „Alege vector CSV”;
+- grupează selectorul presetului local, încărcarea și catalogul de preseturi imediat sub alegerea vectorului;
+- redenumește comanda locală în „Încarcă presetul local” și elimină titlul redundant al secțiunii.
+
 ## 0.1.29
 
 - adaugă în MindExtra o creștere opțională a volumului la începutul sesiunii;

@@ -618,10 +618,13 @@ public final class MainActivity extends Activity {
                 loadDownloadedAudio(downloadedAudioFiles.get(downloadedAudio.getSelectedItemPosition()));
         });
         content.addView(loadAudio);
-        Button onlineCatalog = button("CATALOG ONLINE");
-        onlineCatalog.setOnClickListener(v -> startActivityForResult(
-            new Intent(this, PresetCatalogActivity.class), PICK_ONLINE_PRESET));
-        content.addView(onlineCatalog);
+        Button musicCatalog = button("CATALOG MUZICĂ");
+        musicCatalog.setOnClickListener(v -> startActivityForResult(
+            new Intent(this, PresetCatalogActivity.class)
+                .putExtra(PresetCatalogActivity.EXTRA_RESOURCE_TYPE,
+                    PresetCatalogActivity.TYPE_AUDIO),
+            PICK_ONLINE_PRESET));
+        content.addView(musicCatalog);
 
         title("Sesiune");
         sessionMinutes = decimal(prefs().getString(
@@ -635,22 +638,9 @@ public final class MainActivity extends Activity {
         vectorMode = check("Folosește vector CSV", useVector);
         vectorMode.setOnCheckedChangeListener((b, checked) -> useVector = checked);
         content.addView(vectorMode);
-        Button importVector = button("Importă vector CSV");
+        Button importVector = button("ALEGE VECTOR CSV");
         importVector.setOnClickListener(v -> pickFile(PICK_VECTOR, "text/*"));
         content.addView(importVector);
-        vectorLabel = text(loadedVector == null ? "Niciun vector încărcat" :
-            String.format(Locale.US, "Vector: %.0f secunde", loadedVector.totalSeconds()), 13);
-        content.addView(vectorLabel);
-        vectorStage = text("Vector inactiv", 16);
-        vectorStage.setGravity(Gravity.CENTER);
-        content.addView(vectorStage);
-        Button showVectorGraph = button("AFIȘEAZĂ GRAFICUL VECTORULUI");
-        showVectorGraph.setEnabled(loadedVector != null);
-        showVectorGraph.setAlpha(loadedVector != null ? 1f : 0.4f);
-        showVectorGraph.setOnClickListener(v -> showVectorGraph());
-        content.addView(showVectorGraph);
-
-        title("Preseturi vectoriale descărcate");
         downloadedPresets = PresetStore.list(this);
         String[] localLabels = downloadedPresets.isEmpty() ? new String[]{"Niciun preset descărcat"} :
             downloadedPresets.stream().map(p -> p.name).toArray(String[]::new);
@@ -664,7 +654,7 @@ public final class MainActivity extends Activity {
                 }
             }
         }
-        Button loadLocal = button("ÎNCARCĂ LOCAL");
+        Button loadLocal = button("ÎNCARCĂ PRESETUL LOCAL");
         loadLocal.setEnabled(!downloadedPresets.isEmpty());
         loadLocal.setAlpha(downloadedPresets.isEmpty() ? 0.4f : 1f);
         loadLocal.setOnClickListener(v -> {
@@ -672,6 +662,25 @@ public final class MainActivity extends Activity {
                 loadDownloadedPreset(downloadedPresets.get(downloadedPreset.getSelectedItemPosition()));
         });
         content.addView(loadLocal);
+        Button presetCatalog = button("CATALOG PRESETURI");
+        presetCatalog.setOnClickListener(v -> startActivityForResult(
+            new Intent(this, PresetCatalogActivity.class)
+                .putExtra(PresetCatalogActivity.EXTRA_RESOURCE_TYPE,
+                    PresetCatalogActivity.TYPE_VECTOR),
+            PICK_ONLINE_PRESET));
+        content.addView(presetCatalog);
+
+        vectorLabel = text(loadedVector == null ? "Niciun vector încărcat" :
+            String.format(Locale.US, "Vector: %.0f secunde", loadedVector.totalSeconds()), 13);
+        content.addView(vectorLabel);
+        vectorStage = text("Vector inactiv", 16);
+        vectorStage.setGravity(Gravity.CENTER);
+        content.addView(vectorStage);
+        Button showVectorGraph = button("AFIȘEAZĂ GRAFICUL VECTORULUI");
+        showVectorGraph.setEnabled(loadedVector != null);
+        showVectorGraph.setAlpha(loadedVector != null ? 1f : 0.4f);
+        showVectorGraph.setOnClickListener(v -> showVectorGraph());
+        content.addView(showVectorGraph);
 
         title("Stroboscop");
         boolean strobeDisabled = prefs().getBoolean("energy_disable_strobe", false);
