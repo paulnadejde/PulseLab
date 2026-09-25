@@ -68,6 +68,14 @@ Tranziția ultimului rând este inclusă în durata totală și menține ultimel
 
 ## Construire
 
+LunaRitm și AstraRitm sunt accesibile prin derularea orizontală a barei de taburi.
+LunaRitm arată Luna, iar AstraRitm afișează Soarele, Luna, Mercur, Venus,
+Marte, Jupiter și Saturn: răsărit, apus și declinație la ora curentă.
+Calculele sunt locale și aproximative, pentru orizontul ideal. Coordonatele
+telefonului, ultima poziție memorată și coordonatele manuale sunt comune cu
+SolaRitm. Bifa pentru notificarea agentului orei planetare memorează alegerea;
+notificarea propriu-zisă va fi implementată odată cu orele planetare.
+
 Deschide directorul proiectului în Android Studio, lasă sincronizarea Gradle să
 se încheie, apoi folosește **Build → Build APK(s)**. Alternativ, cu Gradle 8.9
 instalat:

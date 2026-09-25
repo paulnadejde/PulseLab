@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.32 — LunaRitm și AstraRitm
+
+- Două taburi noi, accesibile prin derularea orizontală a barei de navigare, fără micșorarea iconurilor existente.
+- LunaRitm afișează răsăritul, apusul și declinația Lunii; AstraRitm afișează aceleași date pentru cele șapte astre clasice.
+- Data, ora, fusul orar și locația sunt preluate din telefon; se poate utiliza ultima locație memorată ori coordonatele manuale.
+- Opțiunea pentru afișarea agentului orei planetare în notificări este memorată. Calculul orelor planetare și notificarea efectivă urmează într-o etapă separată.
+
 ## 0.1.31
 
 - clarifică prin denumiri distincte alegerea fișierelor din telefon, rularea selecțiilor locale și accesul la cataloagele online;

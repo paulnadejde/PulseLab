@@ -11,12 +11,14 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.view.View;
 
-/** Square, text-free navigation button drawn locally for the four AquaRitm instruments. */
+/** Square, text-free navigation button drawn locally for the AquaRitm instruments. */
 final class NavigationIconView extends View {
     static final int METRONOME = 0;
     static final int BIOSTIM = 1;
     static final int MINDEXTRA = 2;
     static final int SOLARITM = 3;
+    static final int LUNARITM = 4;
+    static final int ASTRARITM = 5;
 
     private final int icon;
     private final boolean active;
@@ -58,7 +60,9 @@ final class NavigationIconView extends View {
             case METRONOME: drawMetronome(canvas, w, h); break;
             case BIOSTIM: drawPulse(canvas, w, h); break;
             case MINDEXTRA: drawBrain(canvas, w, h); break;
-            default: drawSunrise(canvas, w, h); break;
+            case SOLARITM: drawSunrise(canvas, w, h); break;
+            case LUNARITM: drawMoon(canvas, w, h); break;
+            default: drawPlanets(canvas, w, h); break;
         }
         canvas.restore();
     }
@@ -160,5 +164,32 @@ final class NavigationIconView extends View {
         canvas.drawLine(w * .16f, h * .69f, w * .84f, h * .69f, paint);
         canvas.drawLine(w * .24f, h * .79f, w * .76f, h * .79f, paint);
         paint.setStrokeCap(Paint.Cap.BUTT);
+    }
+
+    private void drawMoon(Canvas canvas, float w, float h) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setShader(null);
+        paint.setColor(Color.rgb(236, 235, 217));
+        canvas.drawCircle(w*.50f, h*.49f, w*.27f, paint);
+        paint.setColor(active ? Color.rgb(43, 120, 112) : Color.rgb(38, 44, 51));
+        canvas.drawCircle(w*.64f, h*.39f, w*.26f, paint);
+        paint.setColor(Color.rgb(182, 205, 238));
+        canvas.drawCircle(w*.21f, h*.28f, w*.025f, paint);
+        canvas.drawCircle(w*.76f, h*.74f, w*.025f, paint);
+    }
+
+    private void drawPlanets(Canvas canvas, float w, float h) {
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(w*.036f);
+        paint.setColor(Color.rgb(165, 185, 219));
+        canvas.drawOval(new RectF(w*.17f, h*.29f, w*.83f, h*.72f), paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(253, 195, 85));
+        canvas.drawCircle(w*.5f, h*.5f, w*.11f, paint);
+        paint.setColor(Color.rgb(225, 121, 106));
+        canvas.drawCircle(w*.23f, h*.40f, w*.055f, paint);
+        paint.setColor(Color.rgb(170, 214, 230));
+        canvas.drawCircle(w*.73f, h*.62f, w*.045f, paint);
     }
 }
