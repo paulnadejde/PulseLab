@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.33
+
+- AstraRitm afișează separat cele 12 ore planetare ale zilei și cele 12 ale nopții, cu simbolurile și culorile celor șapte guvernatori.
+- Evidențiază ora curentă și afișează timpul rămas până la următoarea oră planetară.
+- Calculează intervalele din răsărit, apus și răsăritul zilei următoare; înainte de răsărit folosește ziua planetară precedentă.
+- Bifa de notificare pornește agentul AstraRitm și afișează guvernatorul orei curente în bara de notificări.
+
 ## 0.1.32 — LunaRitm și AstraRitm
 
 - Două taburi noi, accesibile prin derularea orizontală a barei de navigare, fără micșorarea iconurilor existente.

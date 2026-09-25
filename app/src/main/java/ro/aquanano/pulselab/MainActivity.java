@@ -65,6 +65,7 @@ import java.util.Locale;
 import ro.aquanano.pulselab.core.FrequencyPreset;
 import ro.aquanano.pulselab.core.AstroCalculator;
 import ro.aquanano.pulselab.core.MetronomeLogic;
+import ro.aquanano.pulselab.core.PlanetaryHours;
 import ro.aquanano.pulselab.core.SolarCalculator;
 import ro.aquanano.pulselab.core.SolarCycle;
 import ro.aquanano.pulselab.core.VectorProgram;
@@ -82,6 +83,7 @@ public final class MainActivity extends Activity {
     private static final int PICK_ONLINE_PRESET = 1003;
     private static final int PICK_FREQUENCY_PRESET = 1004;
     private static final int LOCATION_PERMISSION_REQUEST = 10;
+    private static final int PLANETARY_NOTIFICATION_PERMISSION_REQUEST = 11;
     private static final int ACCENT = Color.rgb(69, 214, 196);
     private static final int PANEL = Color.rgb(21, 21, 21);
 
@@ -179,6 +181,13 @@ public final class MainActivity extends Activity {
     private CheckBox astroPhoneLocation;
     private CheckBox planetaryNotification;
     private String astroCalculationKey;
+    private String planetaryScheduleKey;
+    private PlanetaryHours.Day planetaryDay;
+    private TextView planetaryEvents;
+    private TextView planetaryNow;
+    private TextView[] planetaryRows;
+    private int highlightedPlanetaryHour = -1;
+    private long planetaryTickerSecond = -1;
 
     private final LocationListener solarLocationListener = new LocationListener() {
         @Override public void onLocationChanged(Location location) {
@@ -220,6 +229,7 @@ public final class MainActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         if (getIntent().getBooleanExtra("open_solaritm", false)) currentScreen = SCREEN_SOLARITM;
+        if (getIntent().getBooleanExtra("open_astraritm", false)) currentScreen = SCREEN_ASTRARITM;
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
         setContentView(root);
@@ -231,6 +241,7 @@ public final class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 9);
         }
         SolarAgentService.sync(this);
+        PlanetaryAgentService.sync(this);
         handler.post(uiTicker);
     }
 
@@ -250,6 +261,9 @@ public final class MainActivity extends Activity {
         if (intent.getBooleanExtra("open_solaritm", false)) {
             currentScreen = SCREEN_SOLARITM;
             renderCurrentScreen();
+        } else if (intent.getBooleanExtra("open_astraritm", false)) {
+            currentScreen = SCREEN_ASTRARITM;
+            renderCurrentScreen();
         }
     }
 
@@ -263,6 +277,17 @@ public final class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,
                                                      int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 9 || requestCode == PLANETARY_NOTIFICATION_PERMISSION_REQUEST) {
+            boolean granted = grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (!granted && requestCode == PLANETARY_NOTIFICATION_PERMISSION_REQUEST) {
+                prefs().edit().putBoolean(PlanetaryAgentService.PREF_ENABLED, false).apply();
+                if (planetaryNotification != null) planetaryNotification.setChecked(false);
+                toast("Agentul AstraRitm are nevoie de permisiunea pentru notificări.");
+            }
+            PlanetaryAgentService.sync(this);
+            return;
+        }
         if (requestCode != LOCATION_PERMISSION_REQUEST) return;
         boolean granted = false;
         for (int result : grantResults) granted |= result == PackageManager.PERMISSION_GRANTED;
@@ -317,6 +342,13 @@ public final class MainActivity extends Activity {
         astroPhoneLocation = null;
         planetaryNotification = null;
         astroCalculationKey = null;
+        planetaryScheduleKey = null;
+        planetaryDay = null;
+        planetaryEvents = null;
+        planetaryNow = null;
+        planetaryRows = null;
+        highlightedPlanetaryHour = -1;
+        planetaryTickerSecond = -1;
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(12), dp(8), dp(12), dp(18));
@@ -882,6 +914,7 @@ public final class MainActivity extends Activity {
         Button manual = button("COORDONATE MANUALE");
         content.addView(manual);
         manual.setOnClickListener(v -> showAstroManualLocationDialog());
+        if (!lunar) buildPlanetaryPanel();
 
         AstroCalculator.Body[] bodies = lunar
             ? new AstroCalculator.Body[]{AstroCalculator.Body.MOON}
@@ -904,17 +937,6 @@ public final class MainActivity extends Activity {
             content.addView(card, params);
             astroCards[i] = card;
         }
-        if (!lunar) {
-            planetaryNotification = check(
-                "Afișează agentul orei planetare în bara de notificări",
-                prefs().getBoolean("planetary_agent_notification", false));
-            content.addView(planetaryNotification);
-            planetaryNotification.setOnCheckedChangeListener((button, enabled) ->
-                prefs().edit().putBoolean("planetary_agent_notification", enabled).apply());
-            TextView pending = text("Opțiunea este memorată; afișarea în notificări va fi adăugată odată cu algoritmul orelor planetare.", 13);
-            pending.setTextColor(Color.LTGRAY);
-            content.addView(pending);
-        }
         TextView note = text(
             "Ore astronomice aproximative, calculate local pentru orizontul ideal. "
                 + "Relieful și refracția pot schimba ora observată. "
@@ -922,6 +944,144 @@ public final class MainActivity extends Activity {
         note.setTextColor(Color.LTGRAY);
         content.addView(note);
         setSolarLocationMode(prefs().getBoolean("solar_use_phone_location", true));
+    }
+
+    private void buildPlanetaryPanel() {
+        planetaryEvents = text("Orele planetare așteaptă locația…", 15);
+        planetaryEvents.setTextColor(Color.rgb(242, 190, 102));
+        content.addView(planetaryEvents);
+        planetaryNow = text("", 19);
+        planetaryNow.setTypeface(Typeface.DEFAULT_BOLD);
+        planetaryNow.setTextColor(Color.rgb(255, 218, 122));
+        content.addView(planetaryNow);
+        planetaryRows = new TextView[24];
+        addPlanetarySection("☀  ZI • RĂSĂRIT → APUS", 0, 0xfff0c37b, 0xff30261d);
+        addPlanetarySection("☾  NOAPTE • APUS → RĂSĂRIT", 12, 0xff9eb9ec, 0xff202a43);
+        planetaryNotification = check(
+            "Afișează agentul orei planetare în bara de notificări",
+            prefs().getBoolean(PlanetaryAgentService.PREF_ENABLED, false));
+        content.addView(planetaryNotification);
+        planetaryNotification.setOnCheckedChangeListener((button, enabled) -> {
+            prefs().edit().putBoolean(PlanetaryAgentService.PREF_ENABLED, enabled).apply();
+            if (enabled && android.os.Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    PLANETARY_NOTIFICATION_PERMISSION_REQUEST);
+                return;
+            }
+            PlanetaryAgentService.sync(this);
+        });
+        TextView heading = text("Pozițiile celor șapte astre", 18);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        heading.setTextColor(ACCENT);
+        content.addView(heading);
+    }
+
+    private void addPlanetarySection(String label, int offset, int accent, int background) {
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        section.setPadding(dp(9), dp(10), dp(9), dp(10));
+        GradientDrawable frame = new GradientDrawable();
+        frame.setColor(background);
+        frame.setCornerRadius(dp(13));
+        frame.setStroke(dp(1), accent);
+        section.setBackground(frame);
+        LinearLayout.LayoutParams frameParams = new LinearLayout.LayoutParams(-1, -2);
+        frameParams.setMargins(dp(2), dp(8), dp(2), dp(8));
+        content.addView(section, frameParams);
+        TextView header = text(label, 16);
+        header.setTypeface(Typeface.DEFAULT_BOLD);
+        header.setTextColor(accent);
+        section.addView(header);
+        TextView columns = text("ORA  GUVERNATOR     ÎNCEPUT–SFÂRȘIT", 11);
+        columns.setTypeface(Typeface.MONOSPACE);
+        columns.setTextColor(Color.LTGRAY);
+        section.addView(columns);
+        for (int i = offset; i < offset + 12; i++) {
+            TextView row = text("", 13);
+            row.setTypeface(Typeface.MONOSPACE);
+            row.setPadding(dp(6), dp(7), dp(6), dp(7));
+            row.setTextColor(Color.WHITE);
+            section.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            planetaryRows[i] = row;
+        }
+    }
+
+    private static int planetaryColor(PlanetaryHours.Planet planet) {
+        switch (planet) {
+            case SUN: return 0xffffd062;
+            case MOON: return 0xffd3ddf7;
+            case MERCURY: return 0xff83d7ce;
+            case VENUS: return 0xfff0a5d0;
+            case MARS: return 0xfff28a76;
+            case JUPITER: return 0xffb8a6f2;
+            default: return 0xffb4c6dd;
+        }
+    }
+
+    private void updatePlanetaryPanel(ZonedDateTime now) {
+        if (planetaryRows == null) return;
+        if (!Double.isFinite(solarLatitude) || !Double.isFinite(solarLongitude)) {
+            planetaryDay = null;
+            planetaryScheduleKey = null;
+            planetaryEvents.setText("Orele planetare așteaptă locația…");
+            planetaryNow.setText("");
+            for (TextView row : planetaryRows) row.setText("");
+            return;
+        }
+        String key = now.toLocalDate() + "|" + now.getZone() + "|"
+            + solarLatitude + "|" + solarLongitude;
+        if (!key.equals(planetaryScheduleKey)
+                || (planetaryDay != null
+                    && !now.toInstant().isBefore(planetaryDay.nextSunrise))) {
+            planetaryDay = PlanetaryHours.forMoment(now.toInstant(), now.getZone(),
+                solarLatitude, solarLongitude);
+            planetaryScheduleKey = key;
+            highlightedPlanetaryHour = -1;
+            if (planetaryDay == null) {
+                planetaryEvents.setText("Nu se poate împărți ziua: lipsesc răsăritul sau apusul.");
+                planetaryNow.setText("La latitudini polare, unele zile nu au ore planetare definite.");
+                for (TextView row : planetaryRows) row.setText("");
+                return;
+            }
+            DateTimeFormatter clock = DateTimeFormatter.ofPattern("HH:mm");
+            planetaryEvents.setText("Răsărit " + clock.format(planetaryDay.sunrise.atZone(now.getZone()))
+                + "    •    Amiază "
+                + clock.format(planetaryDay.sunrise.plusMillis(
+                    Duration.between(planetaryDay.sunrise, planetaryDay.sunset).toMillis()/2)
+                    .atZone(now.getZone()))
+                + "    •    Apus " + clock.format(planetaryDay.sunset.atZone(now.getZone()))
+                + "\nZiua planetară: "
+                + planetaryDay.date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")));
+            for (int i = 0; i < 24; i++) {
+                PlanetaryHours.Hour hour = planetaryDay.hours[i];
+                planetaryRows[i].setText(String.format(Locale.forLanguageTag("ro-RO"),
+                    "%02d   %s %-7s  %s–%s",
+                    hour.number, hour.planet.symbol, hour.planet.name,
+                    clock.format(hour.start.atZone(now.getZone())),
+                    clock.format(hour.end.atZone(now.getZone()))));
+            }
+        }
+        if (planetaryDay == null) return;
+        PlanetaryHours.Hour active = planetaryDay.at(now.toInstant());
+        if (active == null) return;
+        long seconds = Duration.between(now.toInstant(), active.end).getSeconds();
+        planetaryNow.setText(active.planet.symbol + " " + active.planet.name
+            + " • ora " + active.number + " • rămân "
+            + String.format(Locale.ROOT, "%02d:%02d:%02d", seconds/3600, seconds/60%60, seconds%60));
+        if (active.number == highlightedPlanetaryHour) return;
+        highlightedPlanetaryHour = active.number;
+        for (int i = 0; i < 24; i++) {
+            TextView row = planetaryRows[i];
+            boolean selected = i == active.number - 1;
+            row.setTextColor(selected ? Color.BLACK : planetaryColor(planetaryDay.hours[i].planet));
+            GradientDrawable tint = new GradientDrawable();
+            tint.setColor(selected ? planetaryColor(active.planet) : Color.TRANSPARENT);
+            tint.setCornerRadius(dp(8));
+            row.setBackground(tint);
+            row.setTypeface(Typeface.MONOSPACE, selected ? Typeface.BOLD : Typeface.NORMAL);
+        }
     }
 
     private void showAstroManualLocationDialog() {
@@ -961,6 +1121,11 @@ public final class MainActivity extends Activity {
     private void updateAstroDisplay() {
         if (astroCards == null) return;
         ZonedDateTime now = ZonedDateTime.now();
+        if (planetaryRows != null && (now.toEpochSecond() != planetaryTickerSecond
+                || planetaryScheduleKey == null)) {
+            planetaryTickerSecond = now.toEpochSecond();
+            updatePlanetaryPanel(now);
+        }
         LocalDate date = now.toLocalDate();
         ZoneId zone = now.getZone();
         astroDate.setText("Data: " + date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
@@ -1385,6 +1550,7 @@ public final class MainActivity extends Activity {
         solarLatitude = latitude;
         solarLongitude = longitude;
         solarCalculationKey = null;
+        planetaryScheduleKey = null;
         if (solarLocationStatus != null) {
             solarLocationStatus.setText(String.format(Locale.US,
                 "%s\nLat %.6f° • Long %.6f°", description, latitude, longitude));
