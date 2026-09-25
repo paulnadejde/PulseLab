@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.35
+
+- Organizează cele șapte file și meniul pe două rânduri, cu pictograme și numele vizibile fără derulare orizontală pe ecranele obișnuite.
+- Adaugă fila ZapaRitm cu selector numeric pentru 0,01–9999 Hz, validare și memorarea frecvenței selectate.
+- Afișează mesajul „În curând: ZapaRitm - ZăZapper”; selectorul nu generează încă semnal.
+
 ## 0.1.34
 
 - LunaRitm afișează un disc lunar și un indicator circular al fazei curente, cu gradele parcurse în faza de 90° și în ciclul de 360°.

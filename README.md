@@ -68,7 +68,7 @@ Tranziția ultimului rând este inclusă în durata totală și menține ultimel
 
 ## Construire
 
-LunaRitm și AstraRitm sunt accesibile prin derularea orizontală a barei de taburi.
+Cele șapte file și meniul sunt accesibile din două rânduri de pictograme etichetate.
 LunaRitm arată Luna, iar AstraRitm afișează Soarele, Luna, Mercur, Venus,
 Marte, Jupiter și Saturn: răsărit, apus și declinație la ora curentă.
 LunaRitm arată și faza curentă, gradele parcurse în fază și în ciclul lunar,
@@ -80,6 +80,8 @@ SolaRitm. AstraRitm împarte perioada de la răsărit la apus și noaptea
 următoare în câte 12 ore planetare, afișate în două secțiuni verticale.
 Ora curentă este evidențiată, cu timpul rămas, iar bifa notificării afișează
 guvernatorul actual în bara de notificări.
+ZapaRitm permite deocamdată alegerea și memorarea unei frecvențe manuale între
+0,01 și 9999 Hz, fără generare de semnal.
 
 Deschide directorul proiectului în Android Studio, lasă sincronizarea Gradle să
 se încheie, apoi folosește **Build → Build APK(s)**. Alternativ, cu Gradle 8.9
