@@ -63,6 +63,7 @@ import java.util.List;
 import java.util.Locale;
 
 import ro.aquanano.pulselab.core.FrequencyPreset;
+import ro.aquanano.pulselab.core.AstroCalculator;
 import ro.aquanano.pulselab.core.MetronomeLogic;
 import ro.aquanano.pulselab.core.SolarCalculator;
 import ro.aquanano.pulselab.core.SolarCycle;
@@ -74,6 +75,8 @@ public final class MainActivity extends Activity {
     private static final int SCREEN_BIOSTIM = 1;
     private static final int SCREEN_MINDEXTRA = 2;
     private static final int SCREEN_SOLARITM = 3;
+    private static final int SCREEN_LUNARITM = 4;
+    private static final int SCREEN_ASTRARITM = 5;
     private static final int PICK_VECTOR = 1001;
     private static final int PICK_MUSIC = 1002;
     private static final int PICK_ONLINE_PRESET = 1003;
@@ -170,16 +173,23 @@ public final class MainActivity extends Activity {
     private SolarCalculator.Events solarYesterdayEvents;
     private SolarCalculator.Events solarTomorrowEvents;
     private Instant solarCycleAnchor;
+    private TextView astroDate;
+    private TextView astroLocation;
+    private TextView[] astroCards;
+    private CheckBox astroPhoneLocation;
+    private CheckBox planetaryNotification;
+    private String astroCalculationKey;
 
     private final LocationListener solarLocationListener = new LocationListener() {
         @Override public void onLocationChanged(Location location) {
-            if (currentScreen != SCREEN_SOLARITM
+            if (!isAstronomyScreen()
                     || !prefs().getBoolean("solar_use_phone_location", true)) return;
             prefs().edit()
                 .putString("solar_phone_latitude", Double.toString(location.getLatitude()))
                 .putString("solar_phone_longitude", Double.toString(location.getLongitude()))
                 .putFloat("solar_phone_accuracy", location.hasAccuracy() ? location.getAccuracy() : -1f)
                 .putString("solar_phone_provider", location.getProvider() == null ? "telefon" : location.getProvider())
+                .putLong("solar_phone_timestamp", location.getTime())
                 .apply();
             applySolarCoordinates(location.getLatitude(), location.getLongitude(),
                 phoneLocationDescription(location, false));
@@ -189,6 +199,8 @@ public final class MainActivity extends Activity {
         @Override public void onProviderDisabled(String provider) {
             if (solarLocationStatus != null && currentScreen == SCREEN_SOLARITM)
                 solarLocationStatus.setText("Furnizor indisponibil: " + provider);
+            if (astroLocation != null && isAstronomyScreen())
+                astroLocation.setText("Furnizor indisponibil: " + provider);
         }
         @Override public void onStatusChanged(String provider, int status, Bundle extras) { }
     };
@@ -255,8 +267,11 @@ public final class MainActivity extends Activity {
         boolean granted = false;
         for (int result : grantResults) granted |= result == PackageManager.PERMISSION_GRANTED;
         if (granted) startSolarLocationUpdates();
-        else if (solarLocationStatus != null)
-            solarLocationStatus.setText("Locație refuzată de Android. Folosește coordonatele manuale.");
+        else {
+            String message = "Locație refuzată de Android. Folosește coordonatele manuale.";
+            if (solarLocationStatus != null) solarLocationStatus.setText(message);
+            if (astroLocation != null) astroLocation.setText(message);
+        }
     }
 
     private void renderCurrentScreen() {
@@ -296,13 +311,19 @@ public final class MainActivity extends Activity {
         solarSunriseSunsetLabel = null;
         solarLargeGlyph = null;
         solarSmallGlyph = null;
+        astroDate = null;
+        astroLocation = null;
+        astroCards = null;
+        astroPhoneLocation = null;
+        planetaryNotification = null;
+        astroCalculationKey = null;
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(12), dp(8), dp(12), dp(18));
         root.addView(page, match());
 
         LinearLayout tabs = horizontal();
-        tabs.setGravity(Gravity.CENTER);
+        tabs.setGravity(Gravity.CENTER_VERTICAL);
         NavigationIconView metroTab = new NavigationIconView(this,
             NavigationIconView.METRONOME, currentScreen == SCREEN_METRONOME, "Metronom");
         NavigationIconView bioStimTab = new NavigationIconView(this,
@@ -311,24 +332,39 @@ public final class MainActivity extends Activity {
             NavigationIconView.MINDEXTRA, currentScreen == SCREEN_MINDEXTRA, "MindExtra");
         NavigationIconView solaRitmTab = new NavigationIconView(this,
             NavigationIconView.SOLARITM, currentScreen == SCREEN_SOLARITM, "SolaRitm");
+        NavigationIconView lunaRitmTab = new NavigationIconView(this,
+            NavigationIconView.LUNARITM, currentScreen == SCREEN_LUNARITM, "LunaRitm");
+        NavigationIconView astraRitmTab = new NavigationIconView(this,
+            NavigationIconView.ASTRARITM, currentScreen == SCREEN_ASTRARITM, "AstraRitm");
         Button settingsButton = button("☰");
         settingsButton.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
         settingsButton.setTextSize(18);
         settingsButton.setContentDescription("Setări AquaRitm");
-        int iconSize = Math.min(dp(62),
-            (getResources().getDisplayMetrics().widthPixels - dp(24 + 60)) / 4);
+        int iconSize = dp(62);
         tabs.addView(metroTab, squareTabParams(iconSize));
         tabs.addView(bioStimTab, squareTabParams(iconSize));
         tabs.addView(mindExtraTab, squareTabParams(iconSize));
         tabs.addView(solaRitmTab, squareTabParams(iconSize));
+        tabs.addView(lunaRitmTab, squareTabParams(iconSize));
+        tabs.addView(astraRitmTab, squareTabParams(iconSize));
         LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(dp(44), dp(40));
         menuParams.setMargins(dp(3), dp(3), dp(3), dp(3));
         tabs.addView(settingsButton, menuParams);
-        page.addView(tabs);
+        // HorizontalScrollView preserves the existing icon dimensions on small phones.
+        android.widget.HorizontalScrollView horizontalTabs = new android.widget.HorizontalScrollView(this);
+        horizontalTabs.setHorizontalScrollBarEnabled(false);
+        horizontalTabs.addView(tabs);
+        page.addView(horizontalTabs);
+        horizontalTabs.post(() -> {
+            if (currentScreen == SCREEN_LUNARITM || currentScreen == SCREEN_ASTRARITM)
+                horizontalTabs.fullScroll(View.FOCUS_RIGHT);
+        });
         metroTab.setOnClickListener(v -> { currentScreen = SCREEN_METRONOME; renderCurrentScreen(); });
         bioStimTab.setOnClickListener(v -> { currentScreen = SCREEN_BIOSTIM; renderCurrentScreen(); });
         mindExtraTab.setOnClickListener(v -> { currentScreen = SCREEN_MINDEXTRA; renderCurrentScreen(); });
         solaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_SOLARITM; renderCurrentScreen(); });
+        lunaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_LUNARITM; renderCurrentScreen(); });
+        astraRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_ASTRARITM; renderCurrentScreen(); });
         settingsButton.setOnClickListener(v ->
             startActivity(new Intent(this, SettingsActivity.class)));
 
@@ -343,6 +379,8 @@ public final class MainActivity extends Activity {
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         if (currentScreen == SCREEN_SOLARITM) {
             buildSolaRitm();
+        } else if (currentScreen == SCREEN_LUNARITM || currentScreen == SCREEN_ASTRARITM) {
+            buildAstronomyScreen();
         } else if (!bound) {
             content.addView(text("Inițializez motorul audio…", 18));
         } else if (currentScreen == SCREEN_BIOSTIM) {
@@ -818,6 +856,152 @@ public final class MainActivity extends Activity {
         setSolarLocationMode(prefs().getBoolean("solar_use_phone_location", true));
     }
 
+    private boolean isAstronomyScreen() {
+        return currentScreen == SCREEN_SOLARITM || currentScreen == SCREEN_LUNARITM
+            || currentScreen == SCREEN_ASTRARITM;
+    }
+
+    private void buildAstronomyScreen() {
+        boolean lunar = currentScreen == SCREEN_LUNARITM;
+        title(lunar ? "LunaRitm • Luna" : "AstraRitm • Cele șapte astre");
+        astroDate = text("", 17);
+        astroDate.setTextColor(ACCENT);
+        content.addView(astroDate);
+        astroLocation = text("", 14);
+        astroLocation.setTextColor(Color.LTGRAY);
+        content.addView(astroLocation);
+
+        astroPhoneLocation = check("Folosește locația telefonului",
+            prefs().getBoolean("solar_use_phone_location", true));
+        content.addView(astroPhoneLocation);
+        astroPhoneLocation.setOnCheckedChangeListener((button, enabled) ->
+            setSolarLocationMode(enabled));
+        Button refresh = button("ACTUALIZEAZĂ LOCAȚIA");
+        content.addView(refresh);
+        refresh.setOnClickListener(v -> startSolarLocationUpdates());
+        Button manual = button("COORDONATE MANUALE");
+        content.addView(manual);
+        manual.setOnClickListener(v -> showAstroManualLocationDialog());
+
+        AstroCalculator.Body[] bodies = lunar
+            ? new AstroCalculator.Body[]{AstroCalculator.Body.MOON}
+            : new AstroCalculator.Body[]{AstroCalculator.Body.SUN, AstroCalculator.Body.MOON,
+                AstroCalculator.Body.MERCURY, AstroCalculator.Body.VENUS,
+                AstroCalculator.Body.MARS, AstroCalculator.Body.JUPITER,
+                AstroCalculator.Body.SATURN};
+        astroCards = new TextView[bodies.length];
+        for (int i = 0; i < bodies.length; i++) {
+            TextView card = text("", 16);
+            card.setPadding(dp(14), dp(12), dp(14), dp(12));
+            GradientDrawable frame = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(32, 34, 45), Color.rgb(17, 19, 25)});
+            frame.setCornerRadius(dp(12));
+            frame.setStroke(dp(1), Color.rgb(79, 112, 139));
+            card.setBackground(frame);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+            params.setMargins(dp(3), dp(7), dp(3), dp(5));
+            content.addView(card, params);
+            astroCards[i] = card;
+        }
+        if (!lunar) {
+            planetaryNotification = check(
+                "Afișează agentul orei planetare în bara de notificări",
+                prefs().getBoolean("planetary_agent_notification", false));
+            content.addView(planetaryNotification);
+            planetaryNotification.setOnCheckedChangeListener((button, enabled) ->
+                prefs().edit().putBoolean("planetary_agent_notification", enabled).apply());
+            TextView pending = text("Opțiunea este memorată; afișarea în notificări va fi adăugată odată cu algoritmul orelor planetare.", 13);
+            pending.setTextColor(Color.LTGRAY);
+            content.addView(pending);
+        }
+        TextView note = text(
+            "Ore astronomice aproximative, calculate local pentru orizontul ideal. "
+                + "Relieful și refracția pot schimba ora observată. "
+                + "Poți folosi ultima locație memorată când serviciul de locație este oprit.", 13);
+        note.setTextColor(Color.LTGRAY);
+        content.addView(note);
+        setSolarLocationMode(prefs().getBoolean("solar_use_phone_location", true));
+    }
+
+    private void showAstroManualLocationDialog() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(16), dp(10), dp(16), dp(10));
+        EditText latitude = coordinateInput(prefs().getString("solar_manual_latitude", ""),
+            "Latitudine (−90…90)");
+        EditText longitude = coordinateInput(prefs().getString("solar_manual_longitude", ""),
+            "Longitudine (−180…180)");
+        panel.addView(latitude);
+        panel.addView(longitude);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle("Coordonate manuale")
+            .setView(panel)
+            .setNegativeButton("RENUNȚĂ", null)
+            .setPositiveButton("MEMOREAZĂ", null)
+            .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            .setOnClickListener(v -> {
+                try {
+                    double lat = parseCoordinate(latitude.getText().toString(), -90, 90);
+                    double lon = parseCoordinate(longitude.getText().toString(), -180, 180);
+                    prefs().edit()
+                        .putString("solar_manual_latitude", String.format(Locale.US, "%.6f", lat))
+                        .putString("solar_manual_longitude", String.format(Locale.US, "%.6f", lon))
+                        .apply();
+                    setSolarLocationMode(false);
+                    dialog.dismiss();
+                } catch (Exception error) {
+                    toast("Coordonate invalide. Latitudine −90…90; longitudine −180…180.");
+                }
+            }));
+        dialog.show();
+    }
+
+    private void updateAstroDisplay() {
+        if (astroCards == null) return;
+        ZonedDateTime now = ZonedDateTime.now();
+        LocalDate date = now.toLocalDate();
+        ZoneId zone = now.getZone();
+        astroDate.setText("Data: " + date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+            + "  •  Ora: " + now.format(DateTimeFormatter.ofPattern("HH:mm"))
+            + "  •  " + zone.getId());
+        if (!Double.isFinite(solarLatitude) || !Double.isFinite(solarLongitude)) {
+            astroLocation.setText(prefs().getBoolean("solar_use_phone_location", true)
+                ? "Locație: în așteptare; activează locația sau folosește coordonatele manuale."
+                : "Locație: nu există coordonate manuale memorate.");
+            for (TextView card : astroCards) card.setText("În așteptarea locației…");
+            return;
+        }
+        astroLocation.setText(currentSolarLocationDescription(
+            prefs().getBoolean("solar_use_phone_location", true)));
+        String key = date + "|" + zone + "|" + solarLatitude + "|" + solarLongitude
+            + "|" + currentScreen + "|" + now.getHour() + ":" + now.getMinute();
+        if (key.equals(astroCalculationKey)) return;
+        astroCalculationKey = key;
+        AstroCalculator.Body[] bodies = currentScreen == SCREEN_LUNARITM
+            ? new AstroCalculator.Body[]{AstroCalculator.Body.MOON}
+            : new AstroCalculator.Body[]{AstroCalculator.Body.SUN, AstroCalculator.Body.MOON,
+                AstroCalculator.Body.MERCURY, AstroCalculator.Body.VENUS,
+                AstroCalculator.Body.MARS, AstroCalculator.Body.JUPITER,
+                AstroCalculator.Body.SATURN};
+        String[] names = currentScreen == SCREEN_LUNARITM
+            ? new String[]{"Luna"}
+            : new String[]{"Soarele", "Luna", "Mercur", "Venus", "Marte", "Jupiter", "Saturn"};
+        DateTimeFormatter clock = DateTimeFormatter.ofPattern("HH:mm");
+        for (int i = 0; i < bodies.length; i++) {
+            AstroCalculator.Events events = AstroCalculator.calculate(
+                bodies[i], date, zone, solarLatitude, solarLongitude, now.toInstant());
+            String rise = events.rise == null ? "nu are loc astăzi" :
+                clock.format(events.rise.atZone(zone));
+            String set = events.set == null ? "nu are loc astăzi" :
+                clock.format(events.set.atZone(zone));
+            astroCards[i].setText(String.format(Locale.forLanguageTag("ro-RO"),
+                "%s\nRăsărit: %s    Apus: %s\nDeclinație acum: %+.2f°",
+                names[i], rise, set, events.declinationNow));
+        }
+    }
+
     private void addSolarCyclePanel() {
         int available = getResources().getDisplayMetrics().widthPixels - dp(48);
         int size = Math.min(dp(320), available);
@@ -1031,6 +1215,9 @@ public final class MainActivity extends Activity {
         if (usePhone) {
             String provider = prefs().getString("solar_phone_provider", "telefon");
             float accuracy = prefs().getFloat("solar_phone_accuracy", -1f);
+            long timestamp = prefs().getLong("solar_phone_timestamp", 0L);
+            source = timestamp == 0 || System.currentTimeMillis() - timestamp > 60_000L
+                ? "Ultima locație memorată" : "Locația telefonului";
             source += " • " + provider
                 + (accuracy >= 0 ? String.format(Locale.US, " • precizie ±%.0f m", accuracy) : "");
         }
@@ -1065,6 +1252,9 @@ public final class MainActivity extends Activity {
             stopSolarLocationUpdates();
             loadManualSolarCoordinates();
         }
+        if (astroPhoneLocation != null && astroPhoneLocation.isChecked() != usePhone)
+            astroPhoneLocation.setChecked(usePhone);
+        if (astroCards != null) updateAstroDisplay();
     }
 
     private void saveManualSolarCoordinates() {
@@ -1128,7 +1318,7 @@ public final class MainActivity extends Activity {
     }
 
     private void startSolarLocationUpdates() {
-        if (currentScreen != SCREEN_SOLARITM
+        if (!isAstronomyScreen()
                 || !prefs().getBoolean("solar_use_phone_location", true)) return;
         boolean fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED;
@@ -1137,6 +1327,8 @@ public final class MainActivity extends Activity {
         if (!fine && !coarse) {
             if (solarLocationStatus != null)
                 solarLocationStatus.setText("Acordă accesul la locație cât timp folosești aplicația.");
+            if (astroLocation != null)
+                astroLocation.setText("Acordă accesul la locație cât timp folosești aplicația.");
             requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
                 Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION_PERMISSION_REQUEST);
             return;
@@ -1145,6 +1337,7 @@ public final class MainActivity extends Activity {
             locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         if (locationManager == null) {
             if (solarLocationStatus != null) solarLocationStatus.setText("Serviciul de locație nu este disponibil.");
+            if (astroLocation != null) astroLocation.setText("Serviciul de locație nu este disponibil.");
             return;
         }
 
@@ -1163,11 +1356,13 @@ public final class MainActivity extends Activity {
                 listening = true;
             } catch (SecurityException | IllegalArgumentException ignored) { }
         }
-        if (best != null) {
-            applySolarCoordinates(best.getLatitude(), best.getLongitude(),
-                phoneLocationDescription(best, true));
-        } else if (solarLocationStatus != null) {
+        if (best != null && best.getTime() >= prefs().getLong("solar_phone_timestamp", 0L)) {
+            solarLocationListener.onLocationChanged(best);
+        } else if (solarLocationStatus != null && !Double.isFinite(solarLatitude)) {
             solarLocationStatus.setText(listening
+                ? "Caut locația telefonului…" : "Activează locația telefonului sau folosește coordonate manuale.");
+        } else if (astroLocation != null && !Double.isFinite(solarLatitude)) {
+            astroLocation.setText(listening
                 ? "Caut locația telefonului…" : "Activează locația telefonului sau folosește coordonate manuale.");
         }
     }
@@ -1195,6 +1390,7 @@ public final class MainActivity extends Activity {
                 "%s\nLat %.6f° • Long %.6f°", description, latitude, longitude));
         }
         updateSolarDisplay();
+        if (astroCards != null) updateAstroDisplay();
     }
 
     private void clearSolarDisplay() {
@@ -1961,8 +2157,8 @@ public final class MainActivity extends Activity {
             if (bound) {
                 AudioEngine e = audioService.engine();
                 if (status != null) {
-                    if (currentScreen == SCREEN_SOLARITM) {
-                        status.setText("SolaRitm • calcul astronomic local");
+                    if (isAstronomyScreen()) {
+                        status.setText("AquaRitm • calcul astronomic local");
                     } else {
                         String m = e.isMetronomeRunning() ? "Metronom activ" : "Metronom oprit";
                         String instrument = e.isBinaural() ? "MindExtra" : "BioStim";
@@ -1995,6 +2191,8 @@ public final class MainActivity extends Activity {
                 updateStrobe();
             }
             if (currentScreen == SCREEN_SOLARITM) updateSolarDisplay();
+            if (currentScreen == SCREEN_LUNARITM || currentScreen == SCREEN_ASTRARITM)
+                updateAstroDisplay();
             boolean strobeNeedsFastRefresh = strobe != null && strobe.isChecked();
             long delay = !strobeNeedsFastRefresh && prefs().getBoolean("energy_slow_ui", false)
                 ? 1000L : 50L;
