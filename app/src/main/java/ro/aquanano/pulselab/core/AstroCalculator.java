@@ -162,6 +162,21 @@ public final class AstroCalculator {
         return equatorial(x, y, z, obliquity, Math.sqrt(x*x+y*y+z*z));
     }
 
+    /** Geocentric ecliptic longitude, in degrees [0, 360). */
+    public static double eclipticLongitude(Body body, Instant instant) {
+        if (body != Body.SUN && body != Body.MOON)
+            throw new IllegalArgumentException("Only Sun and Moon supported");
+        Position p = position(body, instant);
+        double d = instant.getEpochSecond() / 86400.0 + 2440587.5 - 2451543.5;
+        double eps = rad(23.4393 - 3.563e-7 * d);
+        double ra = rad(p.ra), dec = rad(p.dec);
+        double x = Math.cos(dec) * Math.cos(ra);
+        double y = Math.cos(dec) * Math.sin(ra) * Math.cos(eps)
+            + Math.sin(dec) * Math.sin(eps);
+        double longitude = deg(Math.atan2(y, x));
+        return (longitude + 360) % 360;
+    }
+
     private static Vector orbit(double node, double inclination, double perihelion,
                                 double axis, double eccentricity, double anomaly) {
         double m = rad(anomaly);

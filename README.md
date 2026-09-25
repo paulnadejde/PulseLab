@@ -71,6 +71,9 @@ Tranziția ultimului rând este inclusă în durata totală și menține ultimel
 LunaRitm și AstraRitm sunt accesibile prin derularea orizontală a barei de taburi.
 LunaRitm arată Luna, iar AstraRitm afișează Soarele, Luna, Mercur, Venus,
 Marte, Jupiter și Saturn: răsărit, apus și declinație la ora curentă.
+LunaRitm arată și faza curentă, gradele parcurse în fază și în ciclul lunar,
+precum și datele și orele locale ale următoarelor patru faze majore, cu
+pictogramele aferente. Fazele pot fi calculate și fără acces la locație.
 Calculele sunt locale și aproximative, pentru orizontul ideal. Coordonatele
 telefonului, ultima poziție memorată și coordonatele manuale sunt comune cu
 SolaRitm. AstraRitm împarte perioada de la răsărit la apus și noaptea
