@@ -19,6 +19,7 @@ final class NavigationIconView extends View {
     static final int SOLARITM = 3;
     static final int LUNARITM = 4;
     static final int ASTRARITM = 5;
+    static final int ZAPARITM = 6;
 
     private final int icon;
     private final boolean active;
@@ -62,7 +63,8 @@ final class NavigationIconView extends View {
             case MINDEXTRA: drawBrain(canvas, w, h); break;
             case SOLARITM: drawSunrise(canvas, w, h); break;
             case LUNARITM: drawMoon(canvas, w, h); break;
-            default: drawPlanets(canvas, w, h); break;
+            case ASTRARITM: drawPlanets(canvas, w, h); break;
+            default: drawZapper(canvas, w, h); break;
         }
         canvas.restore();
     }
@@ -191,5 +193,24 @@ final class NavigationIconView extends View {
         canvas.drawCircle(w*.23f, h*.40f, w*.055f, paint);
         paint.setColor(Color.rgb(170, 214, 230));
         canvas.drawCircle(w*.73f, h*.62f, w*.045f, paint);
+    }
+
+    private void drawZapper(Canvas canvas, float w, float h) {
+        paint.setShader(null);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setStrokeWidth(w * .06f);
+        paint.setColor(Color.rgb(255, 213, 115));
+        path.reset();
+        path.moveTo(w * .27f, h * .31f);
+        path.lineTo(w * .73f, h * .31f);
+        path.lineTo(w * .29f, h * .70f);
+        path.lineTo(w * .73f, h * .70f);
+        canvas.drawPath(path, paint);
+        paint.setStrokeWidth(w * .025f);
+        paint.setColor(Color.rgb(139, 208, 233));
+        canvas.drawArc(new RectF(w*.12f,h*.12f,w*.88f,h*.88f),210,120,false,paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
     }
 }

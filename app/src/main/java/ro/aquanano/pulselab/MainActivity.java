@@ -79,6 +79,7 @@ public final class MainActivity extends Activity {
     private static final int SCREEN_SOLARITM = 3;
     private static final int SCREEN_LUNARITM = 4;
     private static final int SCREEN_ASTRARITM = 5;
+    private static final int SCREEN_ZAPARITM = 6;
     private static final int PICK_VECTOR = 1001;
     private static final int PICK_MUSIC = 1002;
     private static final int PICK_ONLINE_PRESET = 1003;
@@ -365,8 +366,12 @@ public final class MainActivity extends Activity {
         page.setPadding(dp(12), dp(8), dp(12), dp(18));
         root.addView(page, match());
 
-        LinearLayout tabs = horizontal();
-        tabs.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout tabRows = new LinearLayout(this);
+        tabRows.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout firstRow = horizontal();
+        LinearLayout secondRow = horizontal();
+        firstRow.setGravity(Gravity.CENTER_HORIZONTAL);
+        secondRow.setGravity(Gravity.CENTER_HORIZONTAL);
         NavigationIconView metroTab = new NavigationIconView(this,
             NavigationIconView.METRONOME, currentScreen == SCREEN_METRONOME, "Metronom");
         NavigationIconView bioStimTab = new NavigationIconView(this,
@@ -379,35 +384,33 @@ public final class MainActivity extends Activity {
             NavigationIconView.LUNARITM, currentScreen == SCREEN_LUNARITM, "LunaRitm");
         NavigationIconView astraRitmTab = new NavigationIconView(this,
             NavigationIconView.ASTRARITM, currentScreen == SCREEN_ASTRARITM, "AstraRitm");
+        NavigationIconView zapaRitmTab = new NavigationIconView(this,
+            NavigationIconView.ZAPARITM, currentScreen == SCREEN_ZAPARITM, "ZapaRitm");
         Button settingsButton = button("☰");
         settingsButton.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
         settingsButton.setTextSize(18);
         settingsButton.setContentDescription("Setări AquaRitm");
-        int iconSize = dp(62);
-        tabs.addView(metroTab, squareTabParams(iconSize));
-        tabs.addView(bioStimTab, squareTabParams(iconSize));
-        tabs.addView(mindExtraTab, squareTabParams(iconSize));
-        tabs.addView(solaRitmTab, squareTabParams(iconSize));
-        tabs.addView(lunaRitmTab, squareTabParams(iconSize));
-        tabs.addView(astraRitmTab, squareTabParams(iconSize));
-        LinearLayout.LayoutParams menuParams = new LinearLayout.LayoutParams(dp(44), dp(40));
-        menuParams.setMargins(dp(3), dp(3), dp(3), dp(3));
-        tabs.addView(settingsButton, menuParams);
-        // HorizontalScrollView preserves the existing icon dimensions on small phones.
-        android.widget.HorizontalScrollView horizontalTabs = new android.widget.HorizontalScrollView(this);
-        horizontalTabs.setHorizontalScrollBarEnabled(false);
-        horizontalTabs.addView(tabs);
-        page.addView(horizontalTabs);
-        horizontalTabs.post(() -> {
-            if (currentScreen == SCREEN_LUNARITM || currentScreen == SCREEN_ASTRARITM)
-                horizontalTabs.fullScroll(View.FOCUS_RIGHT);
-        });
+        int available = getResources().getDisplayMetrics().widthPixels - dp(24);
+        int cellSize = Math.min(dp(76), available / 4);
+        int iconSize = Math.min(dp(62), cellSize - dp(6));
+        addNavigationCell(firstRow, metroTab, "Metronom", cellSize, iconSize, currentScreen == SCREEN_METRONOME);
+        addNavigationCell(firstRow, bioStimTab, "BioStim", cellSize, iconSize, currentScreen == SCREEN_BIOSTIM);
+        addNavigationCell(firstRow, mindExtraTab, "MindExtra", cellSize, iconSize, currentScreen == SCREEN_MINDEXTRA);
+        addNavigationCell(firstRow, solaRitmTab, "SolaRitm", cellSize, iconSize, currentScreen == SCREEN_SOLARITM);
+        addNavigationCell(secondRow, lunaRitmTab, "LunaRitm", cellSize, iconSize, currentScreen == SCREEN_LUNARITM);
+        addNavigationCell(secondRow, astraRitmTab, "AstraRitm", cellSize, iconSize, currentScreen == SCREEN_ASTRARITM);
+        addNavigationCell(secondRow, zapaRitmTab, "ZapaRitm", cellSize, iconSize, currentScreen == SCREEN_ZAPARITM);
+        addNavigationCell(secondRow, settingsButton, "Meniu", cellSize, iconSize, false);
+        tabRows.addView(firstRow);
+        tabRows.addView(secondRow);
+        page.addView(tabRows);
         metroTab.setOnClickListener(v -> { currentScreen = SCREEN_METRONOME; renderCurrentScreen(); });
         bioStimTab.setOnClickListener(v -> { currentScreen = SCREEN_BIOSTIM; renderCurrentScreen(); });
         mindExtraTab.setOnClickListener(v -> { currentScreen = SCREEN_MINDEXTRA; renderCurrentScreen(); });
         solaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_SOLARITM; renderCurrentScreen(); });
         lunaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_LUNARITM; renderCurrentScreen(); });
         astraRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_ASTRARITM; renderCurrentScreen(); });
+        zapaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_ZAPARITM; renderCurrentScreen(); });
         settingsButton.setOnClickListener(v ->
             startActivity(new Intent(this, SettingsActivity.class)));
 
@@ -424,6 +427,8 @@ public final class MainActivity extends Activity {
             buildSolaRitm();
         } else if (currentScreen == SCREEN_LUNARITM || currentScreen == SCREEN_ASTRARITM) {
             buildAstronomyScreen();
+        } else if (currentScreen == SCREEN_ZAPARITM) {
+            buildZapaRitm();
         } else if (!bound) {
             content.addView(text("Inițializez motorul audio…", 18));
         } else if (currentScreen == SCREEN_BIOSTIM) {
@@ -434,6 +439,71 @@ public final class MainActivity extends Activity {
             buildMetronome();
         }
         applyKeepScreenOn();
+    }
+
+    private void addNavigationCell(LinearLayout row, View icon, String label,
+                                   int cellSize, int iconSize, boolean selected) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER_HORIZONTAL);
+        cell.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
+        TextView caption = text(label, 10);
+        caption.setSingleLine(true);
+        caption.setGravity(Gravity.CENTER);
+        caption.setPadding(0, 0, 0, dp(2));
+        caption.setTextColor(selected ? ACCENT : Color.LTGRAY);
+        caption.setOnClickListener(v -> icon.performClick());
+        cell.addView(caption, new LinearLayout.LayoutParams(-1, dp(20)));
+        row.addView(cell, new LinearLayout.LayoutParams(cellSize, -2));
+    }
+
+    private void buildZapaRitm() {
+        title("ZapaRitm");
+        TextView coming = text("În curând: ZapaRitm - ZăZapper", 21);
+        coming.setTextColor(Color.rgb(255, 215, 115));
+        coming.setTypeface(Typeface.DEFAULT_BOLD);
+        content.addView(coming);
+
+        TextView label = text("Frecvență manuală (0,01–9999 Hz)", 16);
+        content.addView(label);
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setTextColor(Color.WHITE);
+        input.setSelectAllOnFocus(true);
+        input.setText(prefs().getString("zaparitm_frequency", "1.00"));
+        input.setContentDescription("Frecvență ZapaRitm în hertzi");
+        content.addView(input, new LinearLayout.LayoutParams(-1, dp(56)));
+        TextView saved = text("Frecvența selectată: "
+            + formatZapaFrequency(prefs().getString("zaparitm_frequency", "1.00")) + " Hz", 17);
+        saved.setTextColor(ACCENT);
+        Button save = button("MEMOREAZĂ FRECVENȚA");
+        save.setOnClickListener(v -> {
+            try {
+                double frequency = Double.parseDouble(input.getText().toString().trim().replace(',', '.'));
+                if (!Double.isFinite(frequency) || frequency < 0.01 || frequency > 9999)
+                    throw new NumberFormatException();
+                String normalized = String.format(Locale.US, "%.2f", Math.round(frequency * 100) / 100.0);
+                prefs().edit().putString("zaparitm_frequency", normalized).apply();
+                input.setText(normalized);
+                saved.setText("Frecvența selectată: " + formatZapaFrequency(normalized) + " Hz");
+            } catch (NumberFormatException error) {
+                input.setError("Introdu o valoare între 0,01 și 9999 Hz.");
+            }
+        });
+        content.addView(save);
+        content.addView(saved);
+        TextView note = text("Selectorul memorează doar frecvența. Generarea semnalului va fi adăugată ulterior.", 13);
+        note.setTextColor(Color.LTGRAY);
+        content.addView(note);
+    }
+
+    private String formatZapaFrequency(String stored) {
+        try {
+            return String.format(Locale.forLanguageTag("ro-RO"), "%.2f", Double.parseDouble(stored));
+        } catch (NumberFormatException error) {
+            return "1,00";
+        }
     }
 
     private void buildMetronome() {
@@ -2680,11 +2750,6 @@ public final class MainActivity extends Activity {
 
     private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0, dp(52), 1); }
     private LinearLayout.LayoutParams weightedButton() { return UiStyle.weightedButton(this); }
-    private LinearLayout.LayoutParams squareTabParams(int size) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
-        params.setMargins(dp(2), dp(2), dp(2), dp(2));
-        return params;
-    }
     private FrameLayout.LayoutParams match() { return new FrameLayout.LayoutParams(-1, -1); }
     private LinearLayout.LayoutParams matchWidth() { return new LinearLayout.LayoutParams(-1, -2); }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
