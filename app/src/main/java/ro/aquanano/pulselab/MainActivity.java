@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -91,6 +92,8 @@ public final class MainActivity extends Activity {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private FrameLayout root;
+    private LinearLayout currentPage;
+    private View navigationBar;
     private LinearLayout content;
     private AudioService audioService;
     private boolean bound;
@@ -262,6 +265,14 @@ public final class MainActivity extends Activity {
         else applyKeepScreenOn();
     }
 
+    @Override public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (currentPage == null || navigationBar == null) return;
+        currentPage.removeView(navigationBar);
+        navigationBar = buildNavigationBar();
+        currentPage.addView(navigationBar, 0);
+    }
+
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
@@ -366,53 +377,9 @@ public final class MainActivity extends Activity {
         page.setPadding(dp(12), dp(8), dp(12), dp(18));
         root.addView(page, match());
 
-        LinearLayout tabRows = new LinearLayout(this);
-        tabRows.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout firstRow = horizontal();
-        LinearLayout secondRow = horizontal();
-        firstRow.setGravity(Gravity.CENTER_HORIZONTAL);
-        secondRow.setGravity(Gravity.CENTER_HORIZONTAL);
-        NavigationIconView metroTab = new NavigationIconView(this,
-            NavigationIconView.METRONOME, currentScreen == SCREEN_METRONOME, "Metronom");
-        NavigationIconView bioStimTab = new NavigationIconView(this,
-            NavigationIconView.BIOSTIM, currentScreen == SCREEN_BIOSTIM, "BioStim");
-        NavigationIconView mindExtraTab = new NavigationIconView(this,
-            NavigationIconView.MINDEXTRA, currentScreen == SCREEN_MINDEXTRA, "MindExtra");
-        NavigationIconView solaRitmTab = new NavigationIconView(this,
-            NavigationIconView.SOLARITM, currentScreen == SCREEN_SOLARITM, "SolaRitm");
-        NavigationIconView lunaRitmTab = new NavigationIconView(this,
-            NavigationIconView.LUNARITM, currentScreen == SCREEN_LUNARITM, "LunaRitm");
-        NavigationIconView astraRitmTab = new NavigationIconView(this,
-            NavigationIconView.ASTRARITM, currentScreen == SCREEN_ASTRARITM, "AstraRitm");
-        NavigationIconView zapaRitmTab = new NavigationIconView(this,
-            NavigationIconView.ZAPARITM, currentScreen == SCREEN_ZAPARITM, "ZapaRitm");
-        Button settingsButton = button("☰");
-        settingsButton.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
-        settingsButton.setTextSize(18);
-        settingsButton.setContentDescription("Setări AquaRitm");
-        int available = getResources().getDisplayMetrics().widthPixels - dp(24);
-        int cellSize = Math.min(dp(76), available / 4);
-        int iconSize = Math.min(dp(62), cellSize - dp(6));
-        addNavigationCell(firstRow, metroTab, "Metronom", cellSize, iconSize, currentScreen == SCREEN_METRONOME);
-        addNavigationCell(firstRow, bioStimTab, "BioStim", cellSize, iconSize, currentScreen == SCREEN_BIOSTIM);
-        addNavigationCell(firstRow, mindExtraTab, "MindExtra", cellSize, iconSize, currentScreen == SCREEN_MINDEXTRA);
-        addNavigationCell(firstRow, solaRitmTab, "SolaRitm", cellSize, iconSize, currentScreen == SCREEN_SOLARITM);
-        addNavigationCell(secondRow, lunaRitmTab, "LunaRitm", cellSize, iconSize, currentScreen == SCREEN_LUNARITM);
-        addNavigationCell(secondRow, astraRitmTab, "AstraRitm", cellSize, iconSize, currentScreen == SCREEN_ASTRARITM);
-        addNavigationCell(secondRow, zapaRitmTab, "ZapaRitm", cellSize, iconSize, currentScreen == SCREEN_ZAPARITM);
-        addNavigationCell(secondRow, settingsButton, "Meniu", cellSize, iconSize, false);
-        tabRows.addView(firstRow);
-        tabRows.addView(secondRow);
-        page.addView(tabRows);
-        metroTab.setOnClickListener(v -> { currentScreen = SCREEN_METRONOME; renderCurrentScreen(); });
-        bioStimTab.setOnClickListener(v -> { currentScreen = SCREEN_BIOSTIM; renderCurrentScreen(); });
-        mindExtraTab.setOnClickListener(v -> { currentScreen = SCREEN_MINDEXTRA; renderCurrentScreen(); });
-        solaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_SOLARITM; renderCurrentScreen(); });
-        lunaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_LUNARITM; renderCurrentScreen(); });
-        astraRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_ASTRARITM; renderCurrentScreen(); });
-        zapaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_ZAPARITM; renderCurrentScreen(); });
-        settingsButton.setOnClickListener(v ->
-            startActivity(new Intent(this, SettingsActivity.class)));
+        currentPage = page;
+        navigationBar = buildNavigationBar();
+        page.addView(navigationBar);
 
         status = text("Motoare oprite", 13);
         status.setTextColor(ACCENT);
@@ -439,6 +406,59 @@ public final class MainActivity extends Activity {
             buildMetronome();
         }
         applyKeepScreenOn();
+    }
+
+    private View buildNavigationBar() {
+        boolean landscape = getResources().getConfiguration().orientation
+            == Configuration.ORIENTATION_LANDSCAPE;
+        LinearLayout tabRows = new LinearLayout(this);
+        tabRows.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout firstRow = horizontal();
+        LinearLayout secondRow = horizontal();
+        firstRow.setGravity(Gravity.CENTER_HORIZONTAL);
+        secondRow.setGravity(Gravity.CENTER_HORIZONTAL);
+        NavigationIconView metroTab = new NavigationIconView(this,
+            NavigationIconView.METRONOME, currentScreen == SCREEN_METRONOME, "Metronom");
+        NavigationIconView bioStimTab = new NavigationIconView(this,
+            NavigationIconView.BIOSTIM, currentScreen == SCREEN_BIOSTIM, "BioStim");
+        NavigationIconView mindExtraTab = new NavigationIconView(this,
+            NavigationIconView.MINDEXTRA, currentScreen == SCREEN_MINDEXTRA, "MindExtra");
+        NavigationIconView solaRitmTab = new NavigationIconView(this,
+            NavigationIconView.SOLARITM, currentScreen == SCREEN_SOLARITM, "SolaRitm");
+        NavigationIconView lunaRitmTab = new NavigationIconView(this,
+            NavigationIconView.LUNARITM, currentScreen == SCREEN_LUNARITM, "LunaRitm");
+        NavigationIconView astraRitmTab = new NavigationIconView(this,
+            NavigationIconView.ASTRARITM, currentScreen == SCREEN_ASTRARITM, "AstraRitm");
+        NavigationIconView zapaRitmTab = new NavigationIconView(this,
+            NavigationIconView.ZAPARITM, currentScreen == SCREEN_ZAPARITM, "ZapaRitm");
+        Button settingsButton = button("☰");
+        settingsButton.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
+        settingsButton.setTextSize(18);
+        settingsButton.setContentDescription("Setări AquaRitm");
+        int available = getResources().getDisplayMetrics().widthPixels - dp(24);
+        int cellSize = Math.min(dp(76), available / (landscape ? 8 : 4));
+        int iconSize = Math.min(dp(62), cellSize - dp(6));
+        addNavigationCell(firstRow, metroTab, "Metronom", cellSize, iconSize, currentScreen == SCREEN_METRONOME);
+        addNavigationCell(firstRow, bioStimTab, "BioStim", cellSize, iconSize, currentScreen == SCREEN_BIOSTIM);
+        addNavigationCell(firstRow, mindExtraTab, "MindExtra", cellSize, iconSize, currentScreen == SCREEN_MINDEXTRA);
+        addNavigationCell(firstRow, solaRitmTab, "SolaRitm", cellSize, iconSize, currentScreen == SCREEN_SOLARITM);
+        LinearLayout lastRow = landscape ? firstRow : secondRow;
+        addNavigationCell(lastRow, lunaRitmTab, "LunaRitm", cellSize, iconSize, currentScreen == SCREEN_LUNARITM);
+        addNavigationCell(lastRow, astraRitmTab, "AstraRitm", cellSize, iconSize, currentScreen == SCREEN_ASTRARITM);
+        addNavigationCell(lastRow, zapaRitmTab, "ZapaRitm", cellSize, iconSize, currentScreen == SCREEN_ZAPARITM);
+        addNavigationCell(lastRow, settingsButton, "Meniu", cellSize, iconSize, false);
+        tabRows.addView(firstRow);
+        if (!landscape) tabRows.addView(secondRow);
+        metroTab.setOnClickListener(v -> { currentScreen = SCREEN_METRONOME; renderCurrentScreen(); });
+        bioStimTab.setOnClickListener(v -> { currentScreen = SCREEN_BIOSTIM; renderCurrentScreen(); });
+        mindExtraTab.setOnClickListener(v -> { currentScreen = SCREEN_MINDEXTRA; renderCurrentScreen(); });
+        solaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_SOLARITM; renderCurrentScreen(); });
+        lunaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_LUNARITM; renderCurrentScreen(); });
+        astraRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_ASTRARITM; renderCurrentScreen(); });
+        zapaRitmTab.setOnClickListener(v -> { currentScreen = SCREEN_ZAPARITM; renderCurrentScreen(); });
+        settingsButton.setOnClickListener(v ->
+            startActivity(new Intent(this, SettingsActivity.class)));
+        return tabRows;
     }
 
     private void addNavigationCell(LinearLayout row, View icon, String label,
