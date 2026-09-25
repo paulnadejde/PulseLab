@@ -68,7 +68,8 @@ Tranziția ultimului rând este inclusă în durata totală și menține ultimel
 
 ## Construire
 
-Cele șapte file și meniul sunt accesibile din două rânduri de pictograme etichetate.
+Cele șapte file și meniul sunt accesibile din două rânduri de pictograme etichetate
+în portrait și dintr-un singur rând în landscape.
 LunaRitm arată Luna, iar AstraRitm afișează Soarele, Luna, Mercur, Venus,
 Marte, Jupiter și Saturn: răsărit, apus și declinație la ora curentă.
 LunaRitm arată și faza curentă, gradele parcurse în fază și în ciclul lunar,

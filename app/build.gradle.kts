@@ -13,8 +13,8 @@ android {
         applicationId = "ro.aquanano.pulselab"
         minSdk = 26
         targetSdk = 34
-        versionCode = 36
-        versionName = "0.1.35"
+        versionCode = 37
+        versionName = "0.1.36"
         buildConfigField("String", "SOLARITM_MASTER_PASSWORD_HASH",
             "\"${solarMasterPasswordHash}\"")
     }

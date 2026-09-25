@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.36
+
+- Afișează toate cele șapte file și meniul într-un singur rând în landscape; în portrait păstrează două rânduri.
+- Redesenarea navigării la rotirea telefonului păstrează fila selectată și conținutul aflat în editare.
+
 ## 0.1.35
 
 - Organizează cele șapte file și meniul pe două rânduri, cu pictograme și numele vizibile fără derulare orizontală pe ecranele obișnuite.
