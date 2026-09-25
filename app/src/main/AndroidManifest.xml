@@ -53,5 +53,13 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-selected persistent SolaRitm cycle display" />
         </service>
+        <service
+            android:name=".PlanetaryAgentService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-selected current planetary hour display" />
+        </service>
     </application>
 </manifest>
