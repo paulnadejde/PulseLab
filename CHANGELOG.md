@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.34
+
+- LunaRitm afișează un disc lunar și un indicator circular al fazei curente, cu gradele parcurse în faza de 90° și în ciclul de 360°.
+- Prezintă următoarele patru faze majore în ordine cronologică, cu pictogramele lor și orele locale, indiferent de accesul la locație.
+- Calculează fazele local pe baza pozițiilor Soarelui și Lunii, fără conexiune la internet.
+
 ## 0.1.33
 
 - AstraRitm afișează separat cele 12 ore planetare ale zilei și cele 12 ale nopții, cu simbolurile și culorile celor șapte guvernatori.

@@ -64,6 +64,7 @@ import java.util.Locale;
 
 import ro.aquanano.pulselab.core.FrequencyPreset;
 import ro.aquanano.pulselab.core.AstroCalculator;
+import ro.aquanano.pulselab.core.LunarPhases;
 import ro.aquanano.pulselab.core.MetronomeLogic;
 import ro.aquanano.pulselab.core.PlanetaryHours;
 import ro.aquanano.pulselab.core.SolarCalculator;
@@ -178,6 +179,11 @@ public final class MainActivity extends Activity {
     private TextView astroDate;
     private TextView astroLocation;
     private TextView[] astroCards;
+    private LunarPhaseView lunarCurrentGlyph;
+    private TextView lunarCurrentText;
+    private TextView[] lunarEventTexts;
+    private LunarPhaseView[] lunarEventGlyphs;
+    private String lunarPhaseKey;
     private CheckBox astroPhoneLocation;
     private CheckBox planetaryNotification;
     private String astroCalculationKey;
@@ -339,6 +345,11 @@ public final class MainActivity extends Activity {
         astroDate = null;
         astroLocation = null;
         astroCards = null;
+        lunarCurrentGlyph = null;
+        lunarCurrentText = null;
+        lunarEventTexts = null;
+        lunarEventGlyphs = null;
+        lunarPhaseKey = null;
         astroPhoneLocation = null;
         planetaryNotification = null;
         astroCalculationKey = null;
@@ -915,6 +926,7 @@ public final class MainActivity extends Activity {
         content.addView(manual);
         manual.setOnClickListener(v -> showAstroManualLocationDialog());
         if (!lunar) buildPlanetaryPanel();
+        else buildLunarPanel();
 
         AstroCalculator.Body[] bodies = lunar
             ? new AstroCalculator.Body[]{AstroCalculator.Body.MOON}
@@ -944,6 +956,81 @@ public final class MainActivity extends Activity {
         note.setTextColor(Color.LTGRAY);
         content.addView(note);
         setSolarLocationMode(prefs().getBoolean("solar_use_phone_location", true));
+    }
+
+    private void buildLunarPanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(14), dp(12), dp(14), dp(16));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xff242417);
+        background.setCornerRadius(dp(14));
+        background.setStroke(dp(1), 0xffb89a45);
+        panel.setBackground(background);
+        LinearLayout.LayoutParams panelParams = new LinearLayout.LayoutParams(-1, -2);
+        panelParams.setMargins(dp(3), dp(10), dp(3), dp(12));
+        content.addView(panel, panelParams);
+
+        TextView heading = text("FAZA ACTUALĂ • CICLUL LUNAR", 17);
+        heading.setTextColor(0xffffd463);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        panel.addView(heading);
+        lunarCurrentGlyph = new LunarPhaseView(this, true);
+        LinearLayout.LayoutParams glyphParams = new LinearLayout.LayoutParams(dp(160), dp(160));
+        glyphParams.gravity = Gravity.CENTER_HORIZONTAL;
+        panel.addView(lunarCurrentGlyph, glyphParams);
+        lunarCurrentText = text("", 17);
+        lunarCurrentText.setGravity(Gravity.CENTER);
+        lunarCurrentText.setTextColor(0xffffe0a0);
+        panel.addView(lunarCurrentText);
+
+        TextView upcoming = text("URMĂTOARELE PATRU EVENIMENTE", 15);
+        upcoming.setTextColor(0xffffd463);
+        upcoming.setTypeface(Typeface.DEFAULT_BOLD);
+        upcoming.setPadding(0, dp(18), 0, dp(6));
+        panel.addView(upcoming);
+        lunarEventTexts = new TextView[4];
+        lunarEventGlyphs = new LunarPhaseView[4];
+        for (int i = 0; i < 4; i++) {
+            LinearLayout row = horizontal();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(5), dp(5), dp(5), dp(5));
+            lunarEventGlyphs[i] = new LunarPhaseView(this, false);
+            row.addView(lunarEventGlyphs[i], new LinearLayout.LayoutParams(dp(46), dp(46)));
+            lunarEventTexts[i] = text("", 15);
+            lunarEventTexts[i].setTextColor(Color.WHITE);
+            lunarEventTexts[i].setPadding(dp(10), 0, 0, 0);
+            row.addView(lunarEventTexts[i], new LinearLayout.LayoutParams(0, -2, 1f));
+            panel.addView(row);
+        }
+        TextView note = text("Fazele sunt estimate din pozițiile Soarelui și Lunii; "
+            + "orele sunt afișate în fusul orar al telefonului.", 12);
+        note.setTextColor(Color.LTGRAY);
+        panel.addView(note);
+    }
+
+    private void updateLunarPanel(ZonedDateTime now) {
+        if (lunarCurrentGlyph == null) return;
+        String key = now.toEpochSecond() / 60 + "|" + now.getZone();
+        if (key.equals(lunarPhaseKey)) return;
+        lunarPhaseKey = key;
+        double cycle = LunarPhases.cycleDegrees(now.toInstant());
+        LunarPhases.Phase phase = LunarPhases.currentPhase(now.toInstant());
+        LunarPhases.Phase next = LunarPhases.Phase.values()[(phase.ordinal() + 1) % 4];
+        lunarCurrentGlyph.setDegrees(cycle);
+        lunarCurrentGlyph.setContentDescription(phase.name + ", "
+            + Math.round(cycle) + " grade din ciclul lunar");
+        lunarCurrentText.setText(String.format(Locale.forLanguageTag("ro-RO"),
+            "%s → %s\n%.1f° din această fază (0–90°)\n%.1f° din ciclul lunar (0–360°)",
+            phase.name, next.name, LunarPhases.degreesIntoPhase(now.toInstant()), cycle));
+        LunarPhases.Event[] events = LunarPhases.nextFour(now.toInstant());
+        DateTimeFormatter format = DateTimeFormatter.ofPattern("dd.MM.yyyy • HH:mm");
+        for (int i = 0; i < 4; i++) {
+            lunarEventGlyphs[i].setDegrees(events[i].phase.degrees);
+            lunarEventGlyphs[i].setContentDescription(events[i].phase.name);
+            lunarEventTexts[i].setText(events[i].phase.name + "\n"
+                + format.format(events[i].instant.atZone(now.getZone())));
+        }
     }
 
     private void buildPlanetaryPanel() {
@@ -1121,6 +1208,7 @@ public final class MainActivity extends Activity {
     private void updateAstroDisplay() {
         if (astroCards == null) return;
         ZonedDateTime now = ZonedDateTime.now();
+        updateLunarPanel(now);
         if (planetaryRows != null && (now.toEpochSecond() != planetaryTickerSecond
                 || planetaryScheduleKey == null)) {
             planetaryTickerSecond = now.toEpochSecond();
